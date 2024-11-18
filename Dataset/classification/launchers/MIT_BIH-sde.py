@@ -17,7 +17,6 @@ def train_model(device='cuda', max_epochs=200, *,                               
          dry_run=False,
          **kwargs):                                                               # kwargs passed on to cdeint
 
-    batch_size = 32
     lr = 1e-3
 
     times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32, segment_length=1800, sampling_rate=360)
@@ -54,7 +53,7 @@ def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurall
 
 if __name__ == "__main__":
     # Define parameters directly in the code
-    device = 'cuda'  # Choose 'cuda' or 'cpu'
+    device = 'cpu'  # Choose 'cuda' or 'cpu'
     model_names = ['neuralgsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 

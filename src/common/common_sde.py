@@ -319,7 +319,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
     :param initial:
     :return:
     """
-    if name == 'staticsde': 
+    if name == 'staticsde':
         def make_model():
             vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,

@@ -7,13 +7,17 @@ import torch
 from wfdb import rdsamp, rdann
 from Dataset.classification.utils import common
 
-# Define paths
+# paths
 here = pathlib.Path(__file__).resolve().parent
 base_loc = here / "data"
 dataset_loc = base_loc / "mit-bih-arrhythmia-database-1.0.0"
 dataset_zip = base_loc / "mit-bih-arrhythmia-database-1.0.0.zip"
+processed_data_loc = here / "processed_data" / "mit_bih"
 
-# Download function
+# Ensure directories exist
+processed_data_loc.mkdir(parents=True, exist_ok=True)
+
+# Download and extract the dataset
 def download_data():
     url = "https://physionet.org/static/published-projects/mitdb/mit-bih-arrhythmia-database-1.0.0.zip"
     if not dataset_zip.exists():
@@ -65,8 +69,6 @@ class MITBIHDataset(Dataset):
 
             # Downsample signals
             signals = signals[::self.sampling_rate // 125, :]
-            # print(f"Processing record {record}: {signals.shape}")
-
             for start in range(0, len(signals) - self.segment_length, self.segment_length):
                 segment = signals[start:start + self.segment_length]
                 labels = [
@@ -82,6 +84,13 @@ class MITBIHDataset(Dataset):
 
         if not data:
             print(f"No valid segments found for records in {self.data_dir}.")
+            return []
+
+        # Save the processed data
+        save_path = processed_data_loc / "processed_data.pt"
+        torch.save(data, save_path)
+        print(f"Processed data saved at {save_path}")
+
         return data
 
     def __len__(self):
@@ -124,33 +133,23 @@ def get_data(batch_size=32, segment_length=1800, sampling_rate=360):
                                                    append_times=True,
                                                    append_intensity=False)
 
-    base_base_loc = here / 'processed_data'
-    loc = base_base_loc / ('speech_commands_with_mels')
-    if os.path.exists(loc):
-        tensors = common.load_data(loc)
-        times = tensors['times']
-        train_coeffs = tensors['train_coeffs']
-        val_coeffs = tensors['val_coeffs']
-        test_coeffs = tensors['test_coeffs']
-        train_y = tensors['train_y']
-        val_y = tensors['val_y']
-        test_y = tensors['test_y']
-        train_final_index = tensors['train_final_index']
-        val_final_index = tensors['val_final_index']
-        test_final_index = tensors['test_final_index']
-    # todo: look here
-    # else:
-    #     download_data()
-    #     (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
-    #      test_final_index) = _process_data(intensity_data, percentage=10)
-    #     if not os.path.exists(base_base_loc):
-    #         os.mkdir(base_base_loc)
-    #     if not os.path.exists(loc):
-    #         os.mkdir(loc)
-    #     common.save_data(loc, times=times,
-    #                      train_coeffs=train_coeffs, val_coeffs=val_coeffs, test_coeffs=test_coeffs,
-    #                      train_y=train_y, val_y=val_y, test_y=test_y, train_final_index=train_final_index,
-    #                      val_final_index=val_final_index, test_final_index=test_final_index)
+    common.save_data(processed_data_loc,
+                     times=times,
+                     train_coeffs=train_coeffs, val_coeffs=val_coeffs, test_coeffs=test_coeffs,
+                     train_y=train_y, val_y=val_y, test_y=test_y, train_final_index=train_final_index,
+                     val_final_index=val_final_index, test_final_index=test_final_index)
+
+    tensors = common.load_data(processed_data_loc)
+    times = tensors['times']
+    train_coeffs = tensors['train_coeffs']
+    val_coeffs = tensors['val_coeffs']
+    test_coeffs = tensors['test_coeffs']
+    train_y = tensors['train_y']
+    val_y = tensors['val_y']
+    test_y = tensors['test_y']
+    train_final_index = tensors['train_final_index']
+    val_final_index = tensors['val_final_index']
+    test_final_index = tensors['test_final_index']
 
     times, train_dataloader, val_dataloader, test_dataloader = common.wrap_data(times, train_coeffs, val_coeffs,
                                                                                 test_coeffs, train_y, val_y, test_y,
@@ -161,18 +160,12 @@ def get_data(batch_size=32, segment_length=1800, sampling_rate=360):
     return times, train_dataloader, val_dataloader, test_dataloader
 
 if __name__ == "__main__":
-    # try:
-    #     dataloader = get_data_loader(batch_size=32)
-    #     for X, y in dataloader:
-    #         print(f"Batch X shape: {X.shape}") # [batch_size, 1800, 2]
-    #         print(f"Batch y shape: {y.shape}") # [batch_size]
-    #         break
-    # except ValueError as e:
-    #     print(f"Error: {e}")
     try:
-        X, y = tensor_data()
-        print(f"Full X shape: {X.shape}") # 130 x 1800 x 2
-        print(f"Full y shape: {y.shape}") # 130
+        _, train_dataloader, _, _ = get_data(batch_size=32, segment_length=1800, sampling_rate=360)
+        first_batch = next(iter(train_dataloader))
+        X, y = first_batch[0][0], first_batch[1][0]
+        print(f"First feature shape: {X.shape}") # 1799 x 12
+        print(f"First label: {y}") # a scalar value
     except ValueError as e:
         print(f"Error: {e}")
 
