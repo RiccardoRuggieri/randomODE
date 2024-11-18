@@ -225,8 +225,9 @@ class _TensorEncoder(json.JSONEncoder):
             super(_TensorEncoder, self).default(o)
 
 
+# todo: hardcoded path
 def _save_results(name, result):
-    loc = here / 'results-sde' / name
+    loc = '/home/riccardo-ruggieri/PycharmProjects/neuralSDE/Dataset/classification/utils/results'
     if not os.path.exists(loc):
         os.mkdir(loc)
     num = -1

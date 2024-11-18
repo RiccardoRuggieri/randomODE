@@ -11,8 +11,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-
+# Recall that in neural sde the information about the data is directly
+# passed to the model through the initial condition.
 class InitialValueNetwork(torch.nn.Module):
+    """
+    This class defines the initial condition network for the SDE model.
+    Recall that the initial value x_0 is interpolated from the observed data x
+    and subsequently used to define the mapping for z(0)
+    """
     def __init__(self, intensity, hidden_channels, model):
         super(InitialValueNetwork, self).__init__()
         self.linear1 = torch.nn.Linear(7 if intensity else 5, 256)
@@ -22,6 +28,7 @@ class InitialValueNetwork(torch.nn.Module):
 
     def forward(self, times, coeffs, final_index, **kwargs):
         *coeffs, static = coeffs
+        # computation of the initial condition through non-linearities (NN)
         z0 = self.linear1(static)
         z0 = z0.relu()
         z0 = self.linear2(z0)
@@ -63,7 +70,7 @@ def train_model(intensity, device='cuda', max_epochs=200, pos_weight=10, *, mode
 
 def run_all(intensity, device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurallnsde', 'neuralgsde']):
 
-    hidden = 4
+    hidden = 16
     num_layer = 1
 
     model_kwargs = dict(staticsde=dict(hidden_channels=hidden, hidden_hidden_channels=hidden, num_hidden_layers=num_layer),

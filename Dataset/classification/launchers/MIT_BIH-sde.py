@@ -9,7 +9,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 import src.common.common_sde as common
-import Dataset.classification.utils.speech_commands as speech_commands
+import Dataset.classification.utils.MIT_BIH as MIT_BIH
 
 
 def train_model(device='cuda', max_epochs=200, *,                                        # training parameters
@@ -17,15 +17,14 @@ def train_model(device='cuda', max_epochs=200, *,                               
          dry_run=False,
          **kwargs):                                                               # kwargs passed on to cdeint
 
-    batch_size = 1024
+    batch_size = 32
     lr = 1e-3
 
-    intensity_data = True if model_name in ('odernn', 'dt', 'decay') else False
-    times, train_dataloader, val_dataloader, test_dataloader = speech_commands.get_data(intensity_data,
-                                                                                                 batch_size)
-    input_channels = 1 + (1 + intensity_data) * 20
+    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32, segment_length=1800, sampling_rate=360)
+    # todo: start changing number of parameters from here onward
+    input_channels = 1 + 2
 
-    make_model = common.make_model(model_name, input_channels, 10, hidden_channels, hidden_hidden_channels,
+    make_model = common.make_model(model_name, input_channels, 5, hidden_channels, hidden_hidden_channels,
                                    num_hidden_layers, use_intensity=False, initial=True)
 
     def new_make_model():
@@ -35,7 +34,7 @@ def train_model(device='cuda', max_epochs=200, *,                               
         return model, regularise
 
     name = None if dry_run else 'speech_commands'
-    num_classes = 10
+    num_classes = 5
     return common.main(name, model_name, times, train_dataloader, val_dataloader, test_dataloader, device, new_make_model,
                        num_classes, max_epochs, lr, kwargs, step_mode='valaccuracy')
 
