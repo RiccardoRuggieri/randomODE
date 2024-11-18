@@ -1,3 +1,6 @@
+from scipy.signal import butter, filtfilt
+from sklearn.utils import resample
+from collections import Counter
 import pathlib
 import requests
 import zipfile
@@ -6,7 +9,6 @@ import torch
 import numpy as np
 from wfdb import rdsamp, rdann
 from Dataset.classification.utils import common
-
 
 # paths
 here = pathlib.Path(__file__).resolve().parent
@@ -35,21 +37,13 @@ def download_data():
             zip_ref.extractall(base_loc)
         print("Extraction complete.")
 
-from scipy.signal import butter, filtfilt
 
-def bandpass_filter(signals, lowcut=0.5, highcut=50, fs=360, order=5):
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-    return filtfilt(b, a, signals, axis=0)
-
-# Dataset class
 class MITBIHDataset(Dataset):
-    def __init__(self, data_dir, segment_length=1800, sampling_rate=360):
+    def __init__(self, data_dir, segment_length=1800, sampling_rate=360, augment=False):
         self.data_dir = data_dir
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
+        self.augment = augment
         self.symbol_to_class = {
             'N': 0, 'L': 0, 'R': 0, 'e': 0, 'j': 0,  # Normal beats
             'A': 1, 'a': 1, 'J': 1,                 # Supra-ventricular beats
@@ -60,6 +54,17 @@ class MITBIHDataset(Dataset):
         self.data = self._process_data()
         if not self.data:
             raise ValueError("No data processed. Verify dataset path and processing logic.")
+
+    def _bandpass_filter(self, signals, lowcut=0.5, highcut=50, fs=360, order=5):
+        nyquist = 0.5 * fs
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = butter(order, [low, high], btype='band')
+        return filtfilt(b, a, signals, axis=0)
+
+    def _augment_signal(self, signal, max_noise=0.05):
+        noise = np.random.normal(0, max_noise, signal.shape)
+        return signal + noise
 
     def _process_data(self):
         records = [f.stem for f in self.data_dir.glob("*.dat")]
@@ -77,35 +82,55 @@ class MITBIHDataset(Dataset):
                 print(f"Error reading record {record}: {e}")
                 continue
 
-            # Normalize signals
-            signals = (signals - np.mean(signals, axis=0)) / np.std(signals, axis=0)
+            # Apply bandpass filtering
+            signals = self._bandpass_filter(signals)
 
-            # Bandpass filter
-            signals = bandpass_filter(signals)
+            # Normalize signals to range [-1, 1]
+            signals = 2 * (signals - np.min(signals, axis=0)) / (np.max(signals, axis=0) - np.min(signals, axis=0)) - 1
 
-            for start in range(0, len(signals) - self.segment_length, self.segment_length):
-                segment = signals[start:start + self.segment_length]
-                labels = [
-                    self.symbol_to_class.get(sym, None)  # Ignore unmapped symbols
-                    for sym in annotations.symbol
-                    if start <= annotations.sample[annotations.symbol.index(sym)] < start + self.segment_length
-                ]
-                labels = [label for label in labels if label is not None]  # Remove None values
-                if labels:
-                    majority_class = max(set(labels), key=labels.count)
-                    data.append((torch.tensor(segment, dtype=torch.float32),
-                                 torch.tensor(majority_class, dtype=torch.long)))
+            # Select the first two channels
+            signals = signals[:, :2]
 
-        if not data:
+            # Extract windows around annotated beats
+            for ann_sample, ann_symbol in zip(annotations.sample, annotations.symbol):
+                if ann_symbol in self.symbol_to_class:
+                    start = max(0, ann_sample - self.segment_length // 2)
+                    end = min(len(signals), start + self.segment_length)
+                    segment = signals[start:end]
+                    if len(segment) == self.segment_length:
+                        label = self.symbol_to_class[ann_symbol]
+
+                        # Apply data augmentation
+                        if self.augment and np.random.rand() > 0.5:
+                            segment = self._augment_signal(segment)
+
+                        # Skip segments with low variance
+                        if np.max(segment) - np.min(segment) < 0.01:
+                            continue
+
+                        data.append((torch.tensor(segment, dtype=torch.float32),
+                                     torch.tensor(label, dtype=torch.long)))
+
+        # Balance the dataset
+        labels = [sample[1].item() for sample in data]
+        class_counts = Counter(labels)
+        max_count = max(class_counts.values())
+
+        balanced_data = []
+        for cls in class_counts.keys():
+            class_samples = [sample for sample in data if sample[1] == cls]
+            balanced_class_samples = resample(class_samples, replace=True, n_samples=max_count, random_state=42)
+            balanced_data.extend(balanced_class_samples)
+
+        if not balanced_data:
             print(f"No valid segments found for records in {self.data_dir}.")
             return []
 
         # Save the processed data
-        save_path = processed_data_loc / "processed_data.pt"
-        torch.save(data, save_path)
-        print(f"Processed data saved at {save_path}")
+        torch.save(balanced_data, processed_data_loc / "processed_data.pt")
+        print(f"Processed data saved at {processed_data_loc / 'processed_data.pt'}")
 
-        return data
+        return balanced_data
 
     def __len__(self):
         """
@@ -178,64 +203,3 @@ def get_data(batch_size=32, segment_length=1800, sampling_rate=360):
                                                                                 batch_size=batch_size)
 
     return times, train_dataloader, val_dataloader, test_dataloader
-
-if __name__ == "__main__":
-    try:
-        _, train_dataloader, _, _ = get_data(batch_size=32, segment_length=1800, sampling_rate=360)
-        first_batch = next(iter(train_dataloader))
-        X, y = first_batch[0][0], first_batch[1][0]
-        print(f"First feature shape: {X.shape}") # 1799 x 12
-        print(f"First label: {y}") # a scalar value
-    except ValueError as e:
-        print(f"Error: {e}")
-
-# # MIT-BIH Classification Task
-#
-# The MIT-BIH dataset consists of ECG data with various heartbeat types. This task involves classifying ECG segments into 5 different classes based on their annotations.
-#
-# ## Classes and Their Meanings
-#
-# 1. **Class 0: Normal Beats**
-#    - Includes:
-#      - `N` (Normal)
-#      - `L` (Left bundle branch block)
-#      - `R` (Right bundle branch block)
-#      - `e` (Atrial escape)
-#      - `j` (Nodal (junctional) escape)
-#
-# 2. **Class 1: Supraventricular Ectopic Beats**
-#    - Includes:
-#      - `A` (Atrial premature)
-#      - `a` (Aberrated atrial premature)
-#      - `J` (Nodal (junctional) premature)
-#
-# 3. **Class 2: Ventricular Ectopic Beats**
-#    - Includes:
-#      - `V` (Premature ventricular contraction)
-#      - `E` (Ventricular escape)
-#
-# 4. **Class 3: Fusion Beats**
-#    - Includes:
-#      - `F` (Fusion of ventricular and normal)
-#
-# 5. **Class 4: Unknown or Unclassifiable Beats**
-#    - Includes:
-#      - `/` (Paced)
-#      - `f` (Fusion of paced and normal)
-#      - `Q` (Unclassifiable)
-#
-# ## Dataset Details
-#
-# - **Input (`X`)**:
-#   - Shape: `[batch_size, 1800, 2]`
-#   - `1800`: Number of time steps in each segment (5 seconds of data at a 360 Hz sampling rate).
-#   - `2`: Number of channels (e.g., ECG leads).
-#
-# - **Target (`y`)**:
-#   - Shape: `[batch_size]`
-#   - Contains the class label for each segment.
-#
-# ## Task
-#
-# The objective is to classify each ECG segment into one of the 5 heartbeat classes based on the input data. This is a **multi-class classification task**.
-

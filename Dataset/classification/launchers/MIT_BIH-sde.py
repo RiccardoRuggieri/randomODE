@@ -10,7 +10,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 
 import src.common.common_sde as common
 import Dataset.classification.utils.MIT_BIH as MIT_BIH
-
+import Dataset.classification.utils.MIT_BIH_signal_processing as MIT_BIH_signal_processing
 
 def train_model(device='cuda', max_epochs=200, *,                                        # training parameters
          model_name, hidden_channels, hidden_hidden_channels, num_hidden_layers,  # model parameters
@@ -19,8 +19,14 @@ def train_model(device='cuda', max_epochs=200, *,                               
 
     lr = 1e-3
 
-    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32, segment_length=1800, sampling_rate=360)
-    # todo: start changing number of parameters from here onward
+    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32,
+                                                                                segment_length=1800,
+                                                                                sampling_rate=360)
+
+    # times, train_dataloader, val_dataloader, test_dataloader = (MIT_BIH_signal_processing.get_data(batch_size=32,
+    #                                                                             segment_length=1800,
+    #                                                                             sampling_rate=360))
+
     input_channels = 1 + 2
 
     make_model = common.make_model(model_name, input_channels, 5, hidden_channels, hidden_hidden_channels,
