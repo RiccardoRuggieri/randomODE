@@ -1,6 +1,4 @@
 from scipy.signal import butter, filtfilt
-from sklearn.utils import resample
-from collections import Counter
 import pathlib
 import requests
 import zipfile
@@ -40,7 +38,7 @@ def download_data():
 
 class MITBIHDataset(Dataset):
     def __init__(self, data_dir, segment_length=1800, sampling_rate=360, augment=False):
-        self.data_dir = data_dir
+        self.data_dir = pathlib.Path(data_dir)
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
         self.augment = augment
@@ -51,7 +49,10 @@ class MITBIHDataset(Dataset):
             'F': 3,                                 # Fusion beats
             '/': 4, 'f': 4, 'Q': 4                  # Unclassifiable beats
         }
+        self.processed_data_loc = self.data_dir / "processed"
+        self.processed_data_loc.mkdir(exist_ok=True)
         self.data = self._process_data()
+
         if not self.data:
             raise ValueError("No data processed. Verify dataset path and processing logic.")
 
@@ -62,87 +63,63 @@ class MITBIHDataset(Dataset):
         b, a = butter(order, [low, high], btype='band')
         return filtfilt(b, a, signals, axis=0)
 
-    def _augment_signal(self, signal, max_noise=0.05):
-        noise = np.random.normal(0, max_noise, signal.shape)
-        return signal + noise
+    def _augment_signal(self, signal):
+        if np.random.rand() > 0.5:
+            noise = np.random.normal(0, 0.05, signal.shape)
+            return signal + noise
+        return signal
 
     def _process_data(self):
-        records = [f.stem for f in self.data_dir.glob("*.dat")]
+        records = [f.stem for f in self.data_dir.glob("*.hea")]
         if not records:
             print(f"No records found in {self.data_dir}. Check dataset path.")
             return []
 
         data = []
         for record in records:
-            record_path = str(self.data_dir / record)
             try:
-                signals, _ = rdsamp(record_path)
-                annotations = rdann(record_path, 'atr')
+                signals, _ = rdsamp(str(self.data_dir / record))
+                annotations = rdann(str(self.data_dir / record), 'atr')
             except Exception as e:
                 print(f"Error reading record {record}: {e}")
                 continue
 
-            # Apply bandpass filtering
             signals = self._bandpass_filter(signals)
-
-            # Normalize signals to range [-1, 1]
-            signals = 2 * (signals - np.min(signals, axis=0)) / (np.max(signals, axis=0) - np.min(signals, axis=0)) - 1
-
-            # Select the first two channels
+            signals = 2 * (signals - np.min(signals, axis=0)) / \
+                      (np.max(signals, axis=0) - np.min(signals, axis=0) + 1e-8) - 1
             signals = signals[:, :2]
 
-            # Extract windows around annotated beats
             for ann_sample, ann_symbol in zip(annotations.sample, annotations.symbol):
                 if ann_symbol in self.symbol_to_class:
                     start = max(0, ann_sample - self.segment_length // 2)
-                    end = min(len(signals), start + self.segment_length)
-                    segment = signals[start:end]
+                    end = start + self.segment_length
+                    if end > len(signals):
+                        segment = np.pad(signals[start:], ((0, end - len(signals)), (0, 0)), mode='constant')
+                    else:
+                        segment = signals[start:end]
+
                     if len(segment) == self.segment_length:
                         label = self.symbol_to_class[ann_symbol]
-
-                        # Apply data augmentation
-                        if self.augment and np.random.rand() > 0.5:
+                        if self.augment:
                             segment = self._augment_signal(segment)
-
-                        # Skip segments with low variance
-                        if np.max(segment) - np.min(segment) < 0.01:
-                            continue
-
                         data.append((torch.tensor(segment, dtype=torch.float32),
                                      torch.tensor(label, dtype=torch.long)))
 
-        # Balance the dataset
-        labels = [sample[1].item() for sample in data]
-        class_counts = Counter(labels)
-        max_count = max(class_counts.values())
-
-        balanced_data = []
-        for cls in class_counts.keys():
-            class_samples = [sample for sample in data if sample[1] == cls]
-            balanced_class_samples = resample(class_samples, replace=True, n_samples=max_count, random_state=42)
-            balanced_data.extend(balanced_class_samples)
-
-        if not balanced_data:
+        if not data:
             print(f"No valid segments found for records in {self.data_dir}.")
             return []
 
-        # Save the processed data
-        torch.save(balanced_data, processed_data_loc / "processed_data.pt")
-        print(f"Processed data saved at {processed_data_loc / 'processed_data.pt'}")
+        torch.save(data, self.processed_data_loc / "processed_data.pt")
+        print(f"Processed data saved at {self.processed_data_loc / 'processed_data.pt'}")
 
-        return balanced_data
+        return data
 
     def __len__(self):
-        """
-        Returns the total number of samples in the dataset.
-        """
         return len(self.data)
 
     def __getitem__(self, idx):
-        """
-        Returns a single data sample at the given index.
-        """
         return self.data[idx]
+
 
 # DataLoader function
 def get_data_loader(batch_size=32, segment_length=1800, sampling_rate=360):
