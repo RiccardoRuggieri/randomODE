@@ -35,20 +35,11 @@ def download_data():
             zip_ref.extractall(base_loc)
         print("Extraction complete.")
 
-from scipy.signal import butter, filtfilt
-
-def bandpass_filter(signals, lowcut=0.5, highcut=50, fs=360, order=5):
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-    return filtfilt(b, a, signals, axis=0)
-
 # Dataset class
 class MITBIHDataset(Dataset):
-    def __init__(self, data_dir, segment_length=1800, sampling_rate=360):
+    def __init__(self, data_dir, segment_length=360, sampling_rate=360):
         self.data_dir = data_dir
-        self.segment_length = segment_length
+        #self.segment_length = segment_length
         self.sampling_rate = sampling_rate
         self.symbol_to_class = {
             'N': 0, 'L': 0, 'R': 0, 'e': 0, 'j': 0,  # Normal beats
@@ -68,7 +59,12 @@ class MITBIHDataset(Dataset):
             return []
 
         data = []
+        annotation_count = 0
+
         for record in records:
+            if annotation_count >= 1000:  # Stop if 1,000 annotations have been processed
+                print("Reached 1000 total annotations. Stopping processing.")
+                break
             record_path = str(self.data_dir / record)
             try:
                 signals, _ = rdsamp(record_path)
@@ -80,21 +76,21 @@ class MITBIHDataset(Dataset):
             # Normalize signals
             signals = (signals - np.mean(signals, axis=0)) / np.std(signals, axis=0)
 
-            # Bandpass filter
-            signals = bandpass_filter(signals)
+            # Process each annotation
+            for i, annotation_sample in enumerate(annotations.sample):
+                start = annotation_sample - self.sampling_rate // 2
+                end = annotation_sample + self.sampling_rate // 2
 
-            for start in range(0, len(signals) - self.segment_length, self.segment_length):
-                segment = signals[start:start + self.segment_length]
-                labels = [
-                    self.symbol_to_class.get(sym, None)  # Ignore unmapped symbols
-                    for sym in annotations.symbol
-                    if start <= annotations.sample[annotations.symbol.index(sym)] < start + self.segment_length
-                ]
-                labels = [label for label in labels if label is not None]  # Remove None values
-                if labels:
-                    majority_class = max(set(labels), key=labels.count)
+                # Ensure the segment stays within bounds
+                if start < 0 or end > len(signals):
+                    continue
+
+                segment = signals[start:end]
+                label = self.symbol_to_class.get(annotations.symbol[i], None)
+                if label is not None:
                     data.append((torch.tensor(segment, dtype=torch.float32),
-                                 torch.tensor(majority_class, dtype=torch.long)))
+                                 torch.tensor(label, dtype=torch.long)))
+                    annotation_count += 1
 
         if not data:
             print(f"No valid segments found for records in {self.data_dir}.")
@@ -104,8 +100,11 @@ class MITBIHDataset(Dataset):
         save_path = processed_data_loc / "processed_data.pt"
         torch.save(data, save_path)
         print(f"Processed data saved at {save_path}")
+        print(f"Total segments processed: {len(data)}")
+        print(f"total annotations processed: {annotation_count}")
 
         return data
+
 
     def __len__(self):
         """
@@ -238,4 +237,3 @@ if __name__ == "__main__":
 # ## Task
 #
 # The objective is to classify each ECG segment into one of the 5 heartbeat classes based on the input data. This is a **multi-class classification task**.
-

@@ -19,13 +19,15 @@ def train_model(device='cuda', max_epochs=200, *,                               
 
     lr = 1e-3
 
-    # times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32,
+    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32,
+                                                                                segment_length=540,
+                                                                                sampling_rate=360)
+
+    # at the moment optimal at 540 ----> 73.7% in 12 epochs.
+
+    # times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH_signal_processing.get_data(batch_size=32,
     #                                                                             segment_length=1800,
     #                                                                             sampling_rate=360)
-
-    times, train_dataloader, val_dataloader, test_dataloader = (MIT_BIH_signal_processing.get_data(batch_size=32,
-                                                                                segment_length=1800,
-                                                                                sampling_rate=360))
 
     input_channels = 1 + 2
 
