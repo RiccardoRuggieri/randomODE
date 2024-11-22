@@ -19,8 +19,8 @@ def train_model(device='cuda', max_epochs=200, *,                               
 
     lr = 1e-3
 
-    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32,
-                                                                                segment_length=540,
+    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=64,
+                                                                                segment_length=180,
                                                                                 sampling_rate=360)
 
     # at the moment optimal at 540 ----> 73.7% in 12 epochs.
@@ -48,8 +48,9 @@ def train_model(device='cuda', max_epochs=200, *,                               
 
 def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurallnsde', 'neuralgsde']):
 
-    hidden = 16
+    hidden = 32
     num_layer = 1
+
 
     model_kwargs = dict(staticsde=dict(hidden_channels=hidden, hidden_hidden_channels=hidden, num_hidden_layers=num_layer),
                         naivesde=dict(hidden_channels=hidden, hidden_hidden_channels=hidden, num_hidden_layers=num_layer),

@@ -41,7 +41,7 @@ class MITBIHDataset(Dataset):
         self.data_dir = data_dir
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
-        self.max_count = 1000
+        self.max_count = 2000
         self.symbol_to_class = {
             'N': 0, 'L': 0, 'R': 0, 'e': 0, 'j': 0,  # Normal beats
             'A': 1, 'a': 1, 'J': 1,                 # Supra-ventricular beats
