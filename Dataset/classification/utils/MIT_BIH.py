@@ -3,10 +3,11 @@ import requests
 import zipfile
 from torch.utils.data import Dataset, DataLoader
 import torch
-import numpy as np
+
 from wfdb import rdsamp, rdann
 from Dataset.classification.utils import common
 
+from sklearn.preprocessing import scale
 
 # paths
 here = pathlib.Path(__file__).resolve().parent
@@ -35,19 +36,31 @@ def download_data():
             zip_ref.extractall(base_loc)
         print("Extraction complete.")
 
+# 1. N - Normal
+# 2. V - PVC (Premature ventricular contraction)
+# 3. \ - PAB (Paced beat)
+# 4. R - RBB (Right bundle branch)
+# 5. L - LBB (Left bundle branch)
+# 6. A - APB (Atrial premature beat)
+# 7. ! - AFW (Ventricular flutter wave)
+# 8. E - VEB (Ventricular escape beat)
+
 # Dataset class
 class MITBIHDataset(Dataset):
     def __init__(self, data_dir, segment_length=360, sampling_rate=360):
         self.data_dir = data_dir
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
-        self.max_count = 2000
+        self.max_count = 20000
         self.symbol_to_class = {
-            'N': 0, 'L': 0, 'R': 0, 'e': 0, 'j': 0,  # Normal beats
-            'A': 1, 'a': 1, 'J': 1,                 # Supra-ventricular beats
-            'V': 2, 'E': 2,                         # Ventricular beats
-            'F': 3,                                 # Fusion beats
-            '/': 4, 'f': 4, 'Q': 4                  # Unclassifiable beats
+            'N': 0,
+            'V': 1,
+            '\\': 2,
+            'R': 3,
+            'L': 4,
+            'A': 5,
+            '!': 6,
+            'E': 7,
         }
         self.data = self._process_data()
         if not self.data:
@@ -59,7 +72,7 @@ class MITBIHDataset(Dataset):
             print(f"No records found in {self.data_dir}. Check dataset path.")
             return []
 
-        # Define max count per class (20% of max_count for 5 classes)
+        # Define max count per class (20% of max_count for num classes)
         class_max_count = self.max_count // len(self.symbol_to_class)
 
         # Dictionary to track the count for each class
@@ -77,6 +90,7 @@ class MITBIHDataset(Dataset):
 
             # Normalize signals
             # signals = (signals - np.mean(signals, axis=0)) / np.std(signals, axis=0)
+            signals = scale(signals).astype("float32")
 
             # Process each annotation
             for i, annotation_sample in enumerate(annotations.sample):

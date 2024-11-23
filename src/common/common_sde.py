@@ -8,7 +8,7 @@ import sklearn.metrics
 import torch
 import tqdm
 
-from model.neuralsde import NeuralSDE, Diffusion_model
+from model.neuralsde import NeuralSDE, DiffusionModel
 
 here = pathlib.Path(__file__).resolve().parent
 
@@ -299,8 +299,8 @@ def main(name, model_name, times, train_dataloader, val_dataloader, test_dataloa
                        train_metrics=train_metrics,
                        val_metrics=val_metrics,
                        test_metrics=test_metrics)
-    if name is not None:
-        _save_results(name, result)
+    # if name is not None:
+    #     _save_results(name, result)
     return result
 
 
@@ -321,7 +321,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
     """
     if name == 'staticsde':
         def make_model():
-            vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
                                                   input_option=1, noise_option=0) 
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
@@ -329,7 +329,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
             return model, vector_field
     elif name == 'naivesde': 
         def make_model():
-            vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
                                                   input_option=1, noise_option=18) 
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
@@ -337,7 +337,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
             return model, vector_field
     elif name == 'neurallsde': 
         def make_model():
-            vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
                                                   input_option=2, noise_option=16) 
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
@@ -345,7 +345,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
             return model, vector_field
     elif name == 'neurallnsde': 
         def make_model():
-            vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
                                                   input_option=4, noise_option=17) 
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
@@ -353,7 +353,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
             return model, vector_field
     elif name == 'neuralgsde': 
         def make_model():
-            vector_field = Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
                                                   input_option=6, noise_option=17) 
             model = NeuralSDE(func=vector_field, input_channels=input_channels,

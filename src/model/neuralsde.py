@@ -75,7 +75,7 @@ class NeuralSDE(torch.nn.Module):
         return pred_y
 
         
-class Diffusion_model(torch.nn.Module):
+class DiffusionModel(torch.nn.Module):
     def __init__(self, input_channels, hidden_channels, hidden_hidden_channels, num_hidden_layers, theta=1.0, sigma=1.0, input_option=0, noise_option=0):
         """
         Here you specify drift and diffusion functions (f and g respectively).

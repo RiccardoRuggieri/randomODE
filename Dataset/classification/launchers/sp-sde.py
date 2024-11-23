@@ -9,18 +9,16 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 import src.common.common_sde as common
-import Dataset.classification.utils.MIT_BIH as MIT_BIH
+import Dataset.classification.utils.diffusions_data as diffusion_data
 
-def train_model(device='cuda', max_epochs=50, *,                                        # training parameters
+def train_model(device='cuda', max_epochs=200, *,                                        # training parameters
          model_name, hidden_channels, hidden_hidden_channels, num_hidden_layers,  # model parameters
          dry_run=False,
          **kwargs):                                                               # kwargs passed on to cdeint
 
     lr = 1e-3
 
-    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=512,
-                                                                                segment_length=180,
-                                                                                sampling_rate=360)
+    times, train_dataloader, val_dataloader, test_dataloader = diffusion_data.get_data(batch_size=32)
 
     # at the moment optimal at 540 ----> 73.7% in 12 epochs.
 
@@ -29,9 +27,9 @@ def train_model(device='cuda', max_epochs=50, *,                                
     #                                                                             sampling_rate=360)
 
     # time series channels + time channel
-    input_channels = 1 + 2
+    input_channels = 1 + 1
     # number of classes of the classification problem
-    num_classes = 8
+    num_classes = 5
 
     make_model = common.make_model(model_name, input_channels, num_classes, hidden_channels, hidden_hidden_channels,
                                    num_hidden_layers, use_intensity=False, initial=True)
@@ -65,7 +63,7 @@ def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurall
 if __name__ == "__main__":
     # Define parameters directly in the code
     device = 'cuda'  # Choose 'cuda' or 'cpu'
-    model_names = ['neurallsde']  # List of models to run
+    model_names = ['staticsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 
     for _ in range(num_runs):
