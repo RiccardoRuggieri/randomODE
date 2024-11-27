@@ -33,12 +33,12 @@ class StochasticProcessDataset(Dataset):
         return self.data[idx], self.labels[idx]
 
 
-def generate_stochastic_process_dataset(output_file, num_path_to_generate=1000, timesteps=100, dt=0.1, seed=42):
+def generate_stochastic_process_dataset(output_file, num_path_to_generate=1002, timesteps=100, dt=0.1, seed=42):
     torch.manual_seed(seed)
     import numpy as np
     np.random.seed(seed)
 
-    def generate_ou_process(size, theta=0.5, mu=0.0, sigma=0.1):
+    def generate_ou_process(size, theta=0.5, mu=0.0, sigma=10):
         x = torch.zeros(size)
         for t in range(1, size[1]):
             x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
@@ -50,10 +50,25 @@ def generate_stochastic_process_dataset(output_file, num_path_to_generate=1000, 
             x[:, t] = x[:, t - 1] * torch.exp((mu - 0.5 * sigma**2) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt)))
         return x
 
-    def generate_bm(size, sigma=0.1):
+    def generate_jump_diffusion(size, mu=0.0, sigma=5, jump_intensity=5, jump_mean=0.5, jump_std=2):
         x = torch.zeros(size)
         for t in range(1, size[1]):
-            x[:, t] = x[:, t - 1] + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
+            jump = (torch.rand(size[0]) < jump_intensity * dt).float() * (jump_mean + jump_std * torch.randn(size[0]))
+            x[:, t] = x[:, t - 1] + mu * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt)) + jump
+        return x
+
+    def generate_logistic_process(size, r=0.5, K=1.0, sigma=0.1):
+        x = torch.rand(size) * 0.1  # Start close to 0
+        for t in range(1, size[1]):
+            x[:, t] = x[:, t - 1] + r * x[:, t - 1] * (1 - x[:, t - 1] / K) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
+            x[:, t] = torch.clamp(x[:, t], min=0, max=K)  # Ensure within bounds
+        return x
+
+    def generate_brownian_bridge(size, sigma=0.1):
+        x = torch.zeros(size)
+        for t in range(1, size[1]):
+            drift = -x[:, t - 1] / (size[1] - t)  # Constrains the end point
+            x[:, t] = x[:, t - 1] + drift * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
         return x
 
     def generate_vasicek_process(size, theta=0.5, mu=0.0, sigma=0.1):
@@ -62,18 +77,22 @@ def generate_stochastic_process_dataset(output_file, num_path_to_generate=1000, 
             x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
         return x
 
-    def generate_cir_process(size, theta=0.5, mu=0.1, sigma=0.1):
-        x = torch.abs(torch.randn(size))
+
+    def generate_cir_process(size, theta=0.5, mu=0.5, sigma=2):
+        x = torch.ones(size) * mu  # Start near the long-term mean
         for t in range(1, size[1]):
-            x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.sqrt(torch.abs(x[:, t - 1])) * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
-            x[:, t] = torch.abs(x[:, t])
+            sqrt_x = torch.sqrt(torch.clamp(x[:, t - 1], min=0))  # Ensure no negative values
+            x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * sqrt_x * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
+            x[:, t] = torch.clamp(x[:, t], min=0)  # Keep values non-negative
         return x
 
-    num_classes = 5
+    num_classes = 3
     num_paths_per_class = num_path_to_generate // num_classes
     data, labels = [], []
 
-    process_generators = [generate_ou_process, generate_gbm, generate_bm, generate_vasicek_process, generate_cir_process]
+    process_generators = [generate_ou_process,
+                          generate_cir_process,
+                          generate_jump_diffusion]
 
     for i, generator in enumerate(process_generators):
         paths = generator(size=(num_paths_per_class, timesteps))
@@ -159,7 +178,7 @@ def get_data(batch_size=32):
     return times, train_dataloader, val_dataloader, test_dataloader
 
 
-def plot_sample_paths(file_path=None, num_samples_per_class=2):
+def plot_sample_paths(file_path=None, num_samples_per_class=1):
     # Load dataset
     dataset = StochasticProcessDataset(file_path)
 
@@ -167,7 +186,7 @@ def plot_sample_paths(file_path=None, num_samples_per_class=2):
     data, labels = dataset.data, dataset.labels
 
     # Define the classes
-    num_classes = 5
+    num_classes = 3
 
     # Create a plot
     plt.figure(figsize=(10, 6))

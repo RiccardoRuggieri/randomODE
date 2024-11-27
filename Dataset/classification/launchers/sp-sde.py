@@ -8,10 +8,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-import src.common.common_sde as common
+import common.classification.common_sde as common
 import Dataset.classification.utils.diffusions_data as diffusion_data
 
-def train_model(device='cuda', max_epochs=200, *,                                        # training parameters
+def train_model(device='cuda', max_epochs=50, *,                                        # training parameters
          model_name, hidden_channels, hidden_hidden_channels, num_hidden_layers,  # model parameters
          dry_run=False,
          **kwargs):                                                               # kwargs passed on to cdeint
@@ -29,7 +29,7 @@ def train_model(device='cuda', max_epochs=200, *,                               
     # time series channels + time channel
     input_channels = 1 + 1
     # number of classes of the classification problem
-    num_classes = 5
+    num_classes = 3
 
     make_model = common.make_model(model_name, input_channels, num_classes, hidden_channels, hidden_hidden_channels,
                                    num_hidden_layers, use_intensity=False, initial=True)
@@ -62,8 +62,8 @@ def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurall
 
 if __name__ == "__main__":
     # Define parameters directly in the code
-    device = 'cuda'  # Choose 'cuda' or 'cpu'
-    model_names = ['staticsde']  # List of models to run
+    device = 'cpu'  # Choose 'cuda' or 'cpu'
+    model_names = ['neurallnsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 
     for _ in range(num_runs):

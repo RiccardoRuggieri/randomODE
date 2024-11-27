@@ -8,7 +8,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-import src.common.common_sde as common
+import common.classification.common_sde as common
 import Dataset.classification.utils.MIT_BIH as MIT_BIH
 
 def train_model(device='cuda', max_epochs=50, *,                                        # training parameters
@@ -64,8 +64,8 @@ def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurall
 
 if __name__ == "__main__":
     # Define parameters directly in the code
-    device = 'cuda'  # Choose 'cuda' or 'cpu'
-    model_names = ['neurallsde']  # List of models to run
+    device = 'cpu'  # Choose 'cuda' or 'cpu'
+    model_names = ['neurallnsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 
     for _ in range(num_runs):
