@@ -72,9 +72,11 @@ def main(
         step_mode=step_mode
     )
 
+# remember to choose the device on which to run the code
 if __name__ == "__main__":
     # Fixed parameter values
     main(
+        device="cpu",
         hidden_channels=16,
         hidden_hidden_channels=16,
         num_hidden_layers=1,

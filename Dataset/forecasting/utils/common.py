@@ -8,6 +8,7 @@ import Dataset.forecasting.controldiffeq as controldiffeq
 here = pathlib.Path(__file__).resolve().parent
 sys.path.append(str(here / '..' / '..'))
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def dataloader(dataset, **kwargs):
     if 'shuffle' not in kwargs:
@@ -51,7 +52,7 @@ def normalise_data(X, y):
 
 
 def preprocess_data_forecasting(times, X, y, final_index, append_times):
-    X = X.cuda()
+    X = X.to(device)
 
     full_len = X.shape[0]
     train_len = int(full_len * 0.7)
@@ -61,7 +62,7 @@ def preprocess_data_forecasting(times, X, y, final_index, append_times):
         augmented_X.append(times.unsqueeze(0).repeat(X.size(0), 1).unsqueeze(-1))
 
     augmented_X.append(X)
-    augmented_X[0] = augmented_X[0].cuda()
+    augmented_X[0] = augmented_X[0].to(device)
     if len(augmented_X) == 1:
         X = augmented_X[0]
     else:
@@ -76,10 +77,10 @@ def preprocess_data_forecasting(times, X, y, final_index, append_times):
                                                                                     train_len:val_len], final_index[
                                                                                                         val_len:]
 
-    times = torch.linspace(0, X.size(1) - 1, X.size(1))
-    train_coeffs = controldiffeq.natural_cubic_spline_coeffs(times.cuda(), train_X)
-    val_coeffs = controldiffeq.natural_cubic_spline_coeffs(times.cuda(), val_X)
-    test_coeffs = controldiffeq.natural_cubic_spline_coeffs(times.cuda(), test_X)
+    times = torch.linspace(0, X.size(1) - 1, X.size(1)).to(device)
+    train_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, train_X)
+    val_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, val_X)
+    test_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, test_X)
 
     in_channels = X.size(-1)
 
