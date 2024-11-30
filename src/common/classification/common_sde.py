@@ -8,7 +8,7 @@ import sklearn.metrics
 import torch
 import tqdm
 
-from model.neuralsde import NeuralSDE, DiffusionModel
+from model.neuralsde_classification import NeuralSDE, DiffusionModel
 
 here = pathlib.Path(__file__).resolve().parent
 

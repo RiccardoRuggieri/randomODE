@@ -6,7 +6,7 @@ import torch
 import tqdm
 import os
 
-import model.neuralsde as models
+import model.neuralsde_forecasting as models
 
 here = pathlib.Path(__file__).resolve().parent
 
@@ -203,27 +203,6 @@ class _TensorEncoder(json.JSONEncoder):
         else:
             super(_TensorEncoder, self).default(o)
 
-
-def _save_results(name, result):
-    loc = here / 'results' / name
-    if not os.path.exists(loc):
-        os.mkdir(loc)
-    num = -1
-    for filename in os.listdir(loc):
-        try:
-            num = max(num, int(filename))
-        except ValueError:
-            pass
-    result_to_save = result.copy()
-    del result_to_save['train_dataloader']
-    del result_to_save['val_dataloader']
-    del result_to_save['test_dataloader']
-    result_to_save['model'] = str(result_to_save['model'])
-
-    num += 1
-    with open(loc / str(num), 'w') as f:
-        json.dump(result_to_save, f, cls=_TensorEncoder)
-
         
 def main_forecasting(name, model_name, times, train_dataloader, val_dataloader, test_dataloader, device, make_model, max_epochs,
                      lr, weight_decay, loss, reg, scale, writer, kwargs, step_mode):
@@ -277,9 +256,7 @@ def main_forecasting(name, model_name, times, train_dataloader, val_dataloader, 
                        train_metrics=train_metrics,
                        val_metrics=val_metrics,
                        test_metrics=test_metrics)
-                    
-    if name is not None:
-        _save_results(name, result)
+
     return result
 
 
@@ -296,33 +273,33 @@ def make_model(name,
 
     if name == 'naivesde':
         def make_model():
-            vector_field = models.Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = models.DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=1, noise_option=18) 
+                                                  name=name)
             model = models.NeuralSDE_forecasting(func=vector_field, input_channels=input_channels, output_time=output_time, 
                                                  hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field
     elif name == 'neurallsde': 
         def make_model():
-            vector_field = models.Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = models.DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=2, noise_option=16) 
+                                                  name=name)
             model = models.NeuralSDE_forecasting(func=vector_field, input_channels=input_channels, output_time=output_time, 
                                                  hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field
     elif name == 'neurallnsde': 
         def make_model():
-            vector_field = models.Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = models.DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=4, noise_option=17) 
+                                                  name=name)
             model = models.NeuralSDE_forecasting(func=vector_field, input_channels=input_channels, output_time=output_time, 
                                                  hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field
     elif name == 'neuralgsde': 
         def make_model():
-            vector_field = models.Diffusion_model(input_channels=input_channels, hidden_channels=hidden_channels,
+            vector_field = models.DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=6, noise_option=17) 
+                                                  name=name)
             model = models.NeuralSDE_forecasting(func=vector_field, input_channels=input_channels, output_time=output_time, 
                                                  hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field

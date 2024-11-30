@@ -1,1 +1,1 @@
-from .neuralsde import NeuralSDE, DiffusionModel
+from .neuralsde_classification import NeuralSDE, DiffusionModel

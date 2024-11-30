@@ -59,7 +59,7 @@ def _process_data(append_time,time_seq, missing_rate, y_seq):
             test_final_index)
 
 
-def get_data( batch_size, missing_rate,append_time, time_seq, y_seq):
+def get_data(batch_size, missing_rate, append_time, time_seq, y_seq):
     base_base_loc = here / 'processed_data'
     
     if append_time:
