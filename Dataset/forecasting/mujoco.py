@@ -18,17 +18,15 @@ def _process_data(append_time,time_seq, missing_rate, y_seq):
     feature_lst = ['nan','nan','nan','nan','nan','nan','nan','nan','nan','nan','nan','nan','nan','nan']
     final_indices = []
     for time in X_times:
-        
         final_indices.append(len(time)-1)
-    
+
     maxlen = max(final_indices)+1
     
     for i in range(len(X_times)):
     
         for _ in range(maxlen - len(X_times[i])):
             X_times[i].append([float('nan') for i in feature_lst])
-    
-    final_indices = torch.tensor(final_indices)
+
 
     X_reg = []
     y_reg = []

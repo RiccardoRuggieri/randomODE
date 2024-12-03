@@ -16,7 +16,7 @@ class NeuralSDE_forecasting(torch.nn.Module):
                                           torch.nn.ReLU(),
                                           torch.nn.Linear(hidden_channels, output_channels))
 
-    def forward(self, times, coeffs, **kwargs):
+    def forward(self, times, coeffs, length, **kwargs):
 
         # control module
         self.func.set_X(torch.cat(coeffs, dim=-1), times)
@@ -48,8 +48,11 @@ class NeuralSDE_forecasting(torch.nn.Module):
 
         for i in range(len(z_t.shape) - 2, 0, -1):
             z_t = z_t.transpose(0, i)
+
         input_time = z_t.shape[1]
+
         pred_y = self.linear(z_t[:, input_time - self.output_time:, :])
+
         return pred_y
 
 

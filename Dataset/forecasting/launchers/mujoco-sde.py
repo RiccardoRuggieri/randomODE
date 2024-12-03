@@ -76,7 +76,7 @@ def main(
 if __name__ == "__main__":
     # Fixed parameter values
     main(
-        device="cpu",
+        device="cuda",
         hidden_channels=16,
         hidden_hidden_channels=16,
         num_hidden_layers=1,
