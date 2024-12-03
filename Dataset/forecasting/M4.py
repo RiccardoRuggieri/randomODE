@@ -1,5 +1,7 @@
 import os
 import pathlib
+
+import numpy as np
 import torch
 import pandas as pd
 import requests
@@ -58,7 +60,7 @@ def _process_m4_data(append_time, time_seq, missing_rate, y_seq):
 
     # Assume the first column is the ID and the rest are time series data
     ids = df.iloc[:, 0]  # IDs for tracking
-    data = df.iloc[:, 1:].values  # Time series data (2D: [samples, time])
+    data = df.iloc[1:, 1:].values  # Time series data (2D: [samples, time])
 
     # Convert to tensors
     X_times = [torch.tensor(series[~pd.isnull(series)], dtype=torch.float32) for series in data]
@@ -68,7 +70,8 @@ def _process_m4_data(append_time, time_seq, missing_rate, y_seq):
     for i in range(len(X_times)):
         padding_length = maxlen - len(X_times[i])
         X_times[i] = torch.cat([X_times[i], torch.full((padding_length,), float("nan"))])
-    X_times = torch.stack(X_times)
+    # unsqueeze hereeee!!!
+    X_times = torch.stack(X_times).unsqueeze(-1)
 
     # Generate X_reg and y_reg for forecasting
     X_reg, y_reg = [], []
@@ -77,6 +80,7 @@ def _process_m4_data(append_time, time_seq, missing_rate, y_seq):
             X_reg.append(X_times[i, j:j + time_seq])
             y_reg.append(X_times[i, j + time_seq:j + time_seq + y_seq])
 
+    # convert to tensors
     X_reg = torch.stack(X_reg)
     y_reg = torch.stack(y_reg)
 
@@ -88,7 +92,9 @@ def _process_m4_data(append_time, time_seq, missing_rate, y_seq):
         Xi[removed_points] = float("nan")
 
     # Prepare indices
-    final_indices_reg = torch.full((X_reg.shape[0],), time_seq - 1, dtype=torch.long)
+    final_indices_reg = np.repeat(time_seq-1,X_reg.shape[0])
+    final_indices_reg = torch.tensor(final_indices_reg)
+
     times = torch.linspace(1, X_reg.size(1), X_reg.size(1))
 
     # Use common preprocessing utility
@@ -106,9 +112,9 @@ def get_data(batch_size, missing_rate, append_time, time_seq, y_seq):
     base_base_loc = here / 'processed_data'
 
     if append_time:
-        loc = base_base_loc / ('mujoco' + str(time_seq) + '_' + str(y_seq) + '_' + str(missing_rate) + '_time_aug')
+        loc = base_base_loc / ('M4' + str(time_seq) + '_' + str(y_seq) + '_' + str(missing_rate) + '_time_aug')
     else:
-        loc = base_base_loc / ('mujoco' + str(time_seq) + '_' + str(y_seq) + '_' + str(missing_rate))
+        loc = base_base_loc / ('M4' + str(time_seq) + '_' + str(y_seq) + '_' + str(missing_rate))
     if os.path.exists(loc):
         tensors = common.load_data(loc)
         times = tensors['times']
@@ -161,7 +167,6 @@ if __name__ == "__main__":
     (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
      test_final_index) = result
 
-    print(f"times: {times.shape}")
     print(f"train_coeffs: {train_coeffs.shape}")
     print(f"val_coeffs: {val_coeffs.shape}")
     print(f"test_coeffs: {test_coeffs.shape}")

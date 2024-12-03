@@ -88,38 +88,6 @@ def preprocess_data_forecasting(times, X, y, final_index, append_times):
             test_final_index, in_channels)
 
 
-def preprocess_data(times, X, y, final_index, append_times, append_intensity):
-    X = normalise_data(X, y)
-
-    # Append extra channels together. Note that the order here: time, intensity, original, is important, and some models
-    # depend on that order.
-    augmented_X = []
-    if append_times:
-        augmented_X.append(times.unsqueeze(0).repeat(X.size(0), 1).unsqueeze(-1))
-    if append_intensity:
-        intensity = ~torch.isnan(X)
-        intensity = intensity.to(X.dtype).cumsum(dim=1)
-        augmented_X.append(intensity)
-    augmented_X.append(X)
-    if len(augmented_X) == 1:
-        X = augmented_X[0]
-    else:
-        X = torch.cat(augmented_X, dim=2)
-
-    train_X, val_X, test_X = split_data(X, y)
-    train_y, val_y, test_y = split_data(y, y)
-    train_final_index, val_final_index, test_final_index = split_data(final_index, y)
-
-    train_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, train_X)
-    val_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, val_X)
-    test_coeffs = controldiffeq.natural_cubic_spline_coeffs(times, test_X)
-
-    in_channels = X.size(-1)
-
-    return (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
-            test_final_index, in_channels)
-
-
 def wrap_data(times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
               test_final_index, device, batch_size, num_workers=4):
     times = times.to(device)
