@@ -13,7 +13,7 @@ import requests
 
 def download_m4_csv_files(destination_path):
     base_url = "https://github.com/Mcompetitions/M4-methods/raw/master/Dataset/Train/"
-    m4_files = ["Daily-train.csv"]
+    m4_files = ["Hourly-train.csv"]
 
     os.makedirs(destination_path, exist_ok=True)
     for file_name in m4_files:
@@ -44,17 +44,17 @@ def _process_m4_data(append_time, time_seq, missing_rate, y_seq):
     m4_folder.mkdir(parents=True, exist_ok=True)
 
     # Ensure the dataset is downloaded
-    daily_file = "Daily-train.csv"
-    file_path = m4_folder / daily_file
+    _file = "Hourly-train.csv"
+    file_path = m4_folder / _file
     if not file_path.exists():
         download_m4_csv_files(str(m4_folder))  # Assuming it downloads Daily-train.csv
 
     # Load the dataset
-    print(f"Loading {daily_file}...")
+    print(f"Loading {_file}...")
     try:
         df = pd.read_csv(file_path, on_bad_lines='skip')
     except Exception as e:
-        raise RuntimeError(f"Error reading {daily_file}: {e}")
+        raise RuntimeError(f"Error reading {_file}: {e}")
 
     # Assume the first column is the ID and the rest are time series data
     ids = df.iloc[:, 0]  # IDs for tracking
