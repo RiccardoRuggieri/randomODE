@@ -2,74 +2,6 @@ import torch
 import torchcde
 import torchsde
 
-
-class NeuralSDE(torch.nn.Module):
-    def __init__(self, func, input_channels, hidden_channels, output_channels, initial=True):
-        super().__init__()
-        self.func = func
-        self.initial = initial
-        self.initial_network = torch.nn.Linear(input_channels, hidden_channels)
-
-        # self.linear = torch.nn.Linear(hidden_channels, output_channels)
-        self.linear = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),
-                                          torch.nn.BatchNorm1d(hidden_channels), torch.nn.ReLU(), torch.nn.Dropout(0.1),
-                                          torch.nn.Linear(hidden_channels, output_channels))
-
-    def forward(self, times, coeffs, final_index, z0=None, stream=False, **kwargs):
-        # control module
-        self.func.set_X(*coeffs, times)
-
-        # Figure out what times we need to solve for
-        if stream:
-            t = times
-        else:
-            # faff around to make sure that we're outputting at all the times we need for final_index.
-            sorted_final_index, inverse_final_index = final_index.unique(sorted=True, return_inverse=True)
-            if 0 in sorted_final_index:
-                sorted_final_index = sorted_final_index[1:]
-                final_index = inverse_final_index
-            else:
-                final_index = inverse_final_index + 1
-            if len(times) - 1 in sorted_final_index:
-                sorted_final_index = sorted_final_index[:-1]
-            t = torch.cat([times[0].unsqueeze(0), times[sorted_final_index], times[-1].unsqueeze(0)])
-
-        # Switch default solver
-        if 'method' not in kwargs:
-            kwargs['method'] = 'euler'  # use 'srk' for more accurate solution for SDE
-        if kwargs['method'] == 'euler':
-            if 'options' not in kwargs:
-                kwargs['options'] = {}
-            options = kwargs['options']
-            if 'dt' not in options:
-                time_diffs = times[1:] - times[:-1]
-                options['dt'] = max(time_diffs.min().item(), 1e-3)
-
-        time_diffs = times[1:] - times[:-1]
-        dt = max(time_diffs.min().item(), 1e-3)
-
-        z_t = torchsde.sdeint(sde=self.func,
-                              y0=z0,
-                              ts=t,
-                              dt=dt,
-                              **kwargs)
-
-        # Organise the output
-        if stream:
-            # z_t is a tensor of shape (times, ..., channels), so change this to (..., times, channels)
-            for i in range(len(z_t.shape) - 2, 0, -1):
-                z_t = z_t.transpose(0, i)
-        else:
-            # final_index is a tensor of shape (...)
-            # z_t is a tensor of shape (times, ..., channels)
-            final_index_indices = final_index.unsqueeze(-1).expand(z_t.shape[1:]).unsqueeze(0)
-            z_t = z_t.gather(dim=0, index=final_index_indices).squeeze(0)
-
-        # Linear map and return
-        pred_y = self.linear(z_t)
-        return pred_y
-
-
 class NeuralSDE_forecasting(torch.nn.Module):
     def __init__(self, func, input_channels, output_time, hidden_channels, output_channels, initial=True):
         super().__init__()
@@ -84,7 +16,7 @@ class NeuralSDE_forecasting(torch.nn.Module):
                                           torch.nn.ReLU(),
                                           torch.nn.Linear(hidden_channels, output_channels))
 
-    def forward(self, times, coeffs, final_index, z0=None, stream=False, **kwargs):
+    def forward(self, times, coeffs, **kwargs):
 
         # control module
         self.func.set_X(torch.cat(coeffs, dim=-1), times)
@@ -176,7 +108,7 @@ class DiffusionModel(torch.nn.Module):
         Xt = self.X.evaluate(t)
         Xt = self.initial_network(Xt)
 
-        # Time embedding
+        # Time embedding with positional encoding
         if self.name in ["neurallnsde", "neuralgsde"]:
             if t.dim() == 0:
                 t = torch.full_like(y[:, 0], fill_value=t).unsqueeze(-1)
