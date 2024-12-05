@@ -1,6 +1,6 @@
 import common.forecasting.trainer_forecasting as common
 from random import SystemRandom
-import Dataset.forecasting.mujoco as mujoco
+import Dataset.forecasting.M4 as M4
 import os
 
 from tensorboardX import SummaryWriter
@@ -33,7 +33,7 @@ def main(
     PATH = os.path.dirname(os.path.abspath(__file__))
 
     # Data loader
-    times, train_dataloader, val_dataloader, test_dataloader = mujoco.get_data(
+    times, train_dataloader, val_dataloader, test_dataloader = M4.get_data(
         batch_size, missing_rate, append_time=True, time_seq=time_seq, y_seq=y_seq
     )
 
@@ -41,10 +41,10 @@ def main(
     experiment_id = int(SystemRandom().random() * 100000)
 
     # Feature and time augmentation.
-    input_channels = 1 + 14  # Fixed issue
-    folder_name = f'MuJoCo_{missing_rate}'
+    input_channels = 1 + 1  # Fixed issue
+    folder_name = f'M4_{missing_rate}'
     test_name = f"step_{method}_{model_name}_{experiment_id}"
-    result_folder = f"{PATH}/tensorboard_mujoco"
+    result_folder = f"{PATH}/tensorboard_M4"
     writer = SummaryWriter(f"{result_folder}/runs/{folder_name}/{test_name}")
 
     # Model initialize
@@ -57,7 +57,7 @@ def main(
     if dry_run:
         name = None
     else:
-        name = f'MuJoCo_{missing_rate}'
+        name = f'M4_{missing_rate}'
 
     # Main for forecasting
     return common.main_forecasting(
@@ -83,7 +83,3 @@ if __name__ == "__main__":
         step_mode="valloss",
         model_name="neuralgsde",
     )
-
-
-
-    

@@ -8,24 +8,23 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-import common.classification.trainer_classification as common
-import Dataset.classification.utils.speech_commands as speech_commands
+import common.regression.trainer_regression as common
+import Dataset.regression.utils.diffusions_data_regression as diffusion_data
 
-
-def train_model(device='cuda', max_epochs=200, *,                                        # training parameters
+def train_model(device='cuda', max_epochs=50, *,                                        # training parameters
          model_name, hidden_channels, hidden_hidden_channels, num_hidden_layers,  # model parameters
          dry_run=False,
          **kwargs):                                                               # kwargs passed on to cdeint
 
-    batch_size = 1024
     lr = 1e-3
 
-    intensity_data = True if model_name in ('odernn', 'dt', 'decay') else False
-    times, train_dataloader, val_dataloader, test_dataloader = speech_commands.get_data(intensity_data,
-                                                                                                 batch_size)
-    input_channels = 1 + (1 + intensity_data) * 20
+    times, train_dataloader, val_dataloader, test_dataloader = diffusion_data.get_data(batch_size=32)
 
-    make_model = common.make_model(model_name, input_channels, 10, hidden_channels, hidden_hidden_channels,
+    # time series channels + time channel
+    input_channels = 1 + 1
+    num_classes = 1
+
+    make_model = common.make_model(model_name, input_channels, num_classes, hidden_channels, hidden_hidden_channels,
                                    num_hidden_layers, use_intensity=False, initial=True)
 
     def new_make_model():
@@ -35,15 +34,16 @@ def train_model(device='cuda', max_epochs=200, *,                               
         return model, regularise
 
     name = None if dry_run else 'speech_commands'
-    num_classes = 10
-    return common.main(name, model_name, times, train_dataloader, val_dataloader, test_dataloader, device, new_make_model,
-                       num_classes, max_epochs, lr, kwargs, step_mode='valaccuracy')
+
+    return common.main(name, model_name, times, train_dataloader, val_dataloader, test_dataloader, device,
+                       new_make_model, max_epochs, lr, kwargs)
 
 
 def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurallnsde', 'neuralgsde']):
 
-    hidden = 16
+    hidden = 32
     num_layer = 1
+
 
     model_kwargs = dict(staticsde=dict(hidden_channels=hidden, hidden_hidden_channels=hidden, num_hidden_layers=num_layer),
                         naivesde=dict(hidden_channels=hidden, hidden_hidden_channels=hidden, num_hidden_layers=num_layer),
@@ -56,7 +56,7 @@ def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurall
 if __name__ == "__main__":
     # Define parameters directly in the code
     device = 'cuda'  # Choose 'cuda' or 'cpu'
-    model_names = ['neuralgsde']  # List of models to run
+    model_names = ['neurallsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 
     for _ in range(num_runs):

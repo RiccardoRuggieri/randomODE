@@ -22,21 +22,34 @@ def dataloader(dataset, **kwargs):
     return torch.utils.data.DataLoader(dataset, **kwargs)
 
 
-def split_data(tensor, stratify):
-    # 0.7/0.15/0.15 train/val/test split
-    (train_tensor, testval_tensor,
-     train_stratify, testval_stratify) = sklearn.model_selection.train_test_split(tensor, stratify,
-                                                                                  train_size=0.7,
-                                                                                  random_state=0,
-                                                                                  shuffle=True,
-                                                                                  stratify=stratify)
+def split_data(tensor, stratify=None):
+    if stratify is not None:
+        # 0.7/0.15/0.15 train/val/test split with stratification
+        (train_tensor, testval_tensor,
+         train_stratify, testval_stratify) = sklearn.model_selection.train_test_split(tensor, stratify,
+                                                                                      train_size=0.7,
+                                                                                      random_state=0,
+                                                                                      shuffle=True,
+                                                                                      stratify=stratify)
 
-    val_tensor, test_tensor = sklearn.model_selection.train_test_split(testval_tensor,
-                                                                       train_size=0.5,
-                                                                       random_state=1,
-                                                                       shuffle=True,
-                                                                       stratify=testval_stratify)
-    return train_tensor, val_tensor, test_tensor
+        val_tensor, test_tensor = sklearn.model_selection.train_test_split(testval_tensor,
+                                                                           train_size=0.5,
+                                                                           random_state=1,
+                                                                           shuffle=True,
+                                                                           stratify=testval_stratify)
+        return train_tensor, val_tensor, test_tensor
+    else:
+        # 0.7/0.15/0.15 train/val/test split without stratification
+        train_tensor, testval_tensor = sklearn.model_selection.train_test_split(tensor,
+                                                                                train_size=0.7,
+                                                                                random_state=0,
+                                                                                shuffle=True)
+
+        val_tensor, test_tensor = sklearn.model_selection.train_test_split(testval_tensor,
+                                                                           train_size=0.5,
+                                                                           random_state=1,
+                                                                           shuffle=True)
+        return train_tensor, val_tensor, test_tensor
 
 
 def normalise_data(X, y):
@@ -80,7 +93,7 @@ def preprocess_data(times, X, y, final_index, append_times, append_intensity):
     train_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(train_X, times)
     val_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(val_X, times)
     test_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(test_X, times)
-        
+
     in_channels = X.size(-1)
 
     return (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
@@ -89,7 +102,6 @@ def preprocess_data(times, X, y, final_index, append_times, append_intensity):
 
 def wrap_data(times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
               test_final_index, device, batch_size, num_workers=4):
-        
     times = times.to(device)
     train_y = train_y.to(device)
     val_y = val_y.to(device)
@@ -115,7 +127,7 @@ def wrap_data(times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test
         train_dataset = torch.utils.data.TensorDataset(*train_coeffs, train_y, train_final_index)
         val_dataset = torch.utils.data.TensorDataset(*val_coeffs, val_y, val_final_index)
         test_dataset = torch.utils.data.TensorDataset(*test_coeffs, test_y, test_final_index)
-        
+
     train_dataloader = dataloader(train_dataset, batch_size=batch_size, num_workers=num_workers)
     val_dataloader = dataloader(val_dataset, batch_size=batch_size, num_workers=num_workers)
     test_dataloader = dataloader(test_dataset, batch_size=batch_size, num_workers=num_workers)
@@ -136,3 +148,57 @@ def load_data(dir):
             tensor_value = torch.load(str(dir / filename))
             tensors[tensor_name] = tensor_value
     return tensors
+
+# regression task
+def preprocess_data_regression(times, X, y, final_index, append_times, append_intensity):
+    X = normalise_data(X, y)
+
+    # Append extra channels together. Note that the order here: time, intensity, original, is important, and some models
+    # depend on that order.
+    augmented_X = []
+    if append_times:
+        augmented_X.append(times.unsqueeze(0).repeat(X.size(0), 1).unsqueeze(-1))
+    if append_intensity:
+        intensity = ~torch.isnan(X)  # of size (batch, stream, channels)
+        intensity = intensity.to(X.dtype).cumsum(dim=1)
+        augmented_X.append(intensity)
+    augmented_X.append(X)
+    if len(augmented_X) == 1:
+        X = augmented_X[0]
+    else:
+        X = torch.cat(augmented_X, dim=2)
+
+    train_X, val_X, test_X = split_data(X)
+    train_final_index, val_final_index, test_final_index = split_data(final_index)
+
+    train_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(train_X, times)
+    val_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(val_X, times)
+    test_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(test_X, times)
+
+    in_channels = X.size(-1)
+
+    return (times, train_coeffs, val_coeffs, test_coeffs, train_final_index, val_final_index,
+            test_final_index, in_channels)
+
+def wrap_data_regression(times, train_coeffs, val_coeffs, test_coeffs, train_final_index, val_final_index,
+              test_final_index, device, batch_size, num_workers=4):
+    times = times.to(device)
+    train_final_index = train_final_index.to(device)
+    val_final_index = val_final_index.to(device)
+    test_final_index = test_final_index.to(device)
+
+
+    train_coeffs = train_coeffs.to(device)
+    val_coeffs = val_coeffs.to(device)
+    test_coeffs = test_coeffs.to(device)
+
+    train_dataset = torch.utils.data.TensorDataset(train_coeffs, train_final_index)
+    val_dataset = torch.utils.data.TensorDataset(val_coeffs, val_final_index)
+    test_dataset = torch.utils.data.TensorDataset(test_coeffs, test_final_index)
+
+
+    train_dataloader = dataloader(train_dataset, batch_size=batch_size, num_workers=num_workers)
+    val_dataloader = dataloader(val_dataset, batch_size=batch_size, num_workers=num_workers)
+    test_dataloader = dataloader(test_dataset, batch_size=batch_size, num_workers=num_workers)
+
+    return times, train_dataloader, val_dataloader, test_dataloader

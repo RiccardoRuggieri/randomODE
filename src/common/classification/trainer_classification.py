@@ -8,7 +8,7 @@ import sklearn.metrics
 import torch
 import tqdm
 
-from model.neuralsde_classification import NeuralSDE, DiffusionModel
+from model.classification.my_neural_lsde import NeuralSDE, DiffusionModel
 
 here = pathlib.Path(__file__).resolve().parent
 
@@ -225,28 +225,6 @@ class _TensorEncoder(json.JSONEncoder):
             super(_TensorEncoder, self).default(o)
 
 
-# todo: hardcoded path
-def _save_results(name, result):
-    loc = '/home/riccardo-ruggieri/PycharmProjects/neuralSDE/Dataset/classification/utils/results'
-    if not os.path.exists(loc):
-        os.mkdir(loc)
-    num = -1
-    for filename in os.listdir(loc):
-        try:
-            num = max(num, int(filename))
-        except ValueError:
-            pass
-    result_to_save = result.copy()
-    del result_to_save['train_dataloader']
-    del result_to_save['val_dataloader']
-    del result_to_save['test_dataloader']
-    result_to_save['model'] = str(result_to_save['model'])
-
-    num += 1
-    with open(loc / str(num), 'w') as f:
-        json.dump(result_to_save, f, cls=_TensorEncoder)
-
-
 def main(name, model_name, times, train_dataloader, val_dataloader, test_dataloader, device, make_model, num_classes, max_epochs,
          lr, kwargs, step_mode, pos_weight=torch.tensor(1)):
     times = times.to(device)
@@ -261,6 +239,9 @@ def main(name, model_name, times, train_dataloader, val_dataloader, test_dataloa
         model = _SqueezeEnd(model)
         # Binary classification
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    elif num_classes == 0:
+        # Regression
+        loss_fn = torch.nn.MSELoss()
     else:
         # Multi-class classification
         loss_fn = torch.nn.functional.cross_entropy
@@ -299,8 +280,7 @@ def main(name, model_name, times, train_dataloader, val_dataloader, test_dataloa
                        train_metrics=train_metrics,
                        val_metrics=val_metrics,
                        test_metrics=test_metrics)
-    # if name is not None:
-    #     _save_results(name, result)
+
     return result
 
 
@@ -338,8 +318,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
     elif name == 'neurallsde': 
         def make_model():
             vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
-                                                  hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=2, noise_option=16) 
+                                                  hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers)
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
                                      hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field

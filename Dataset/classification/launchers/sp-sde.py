@@ -8,7 +8,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-import common.classification.common_sde as common
+import common.classification.trainer_classification as common
 import Dataset.classification.utils.diffusions_data as diffusion_data
 
 def train_model(device='cuda', max_epochs=50, *,                                        # training parameters

@@ -1,6 +1,6 @@
 import os
 import torch
-import common.classification.common_sde as common
+import common.classification.trainer_classification as common
 import Dataset.classification.utils.sepsis as sepsis
 
 # CUDA for PyTorch

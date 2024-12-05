@@ -9,7 +9,6 @@ from Dataset.forecasting.utils import common
 
 here = pathlib.Path(__file__).resolve().parent
 
-
 import os
 import requests
 
@@ -166,13 +165,3 @@ if __name__ == "__main__":
     # Output shapes for verification
     (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
      test_final_index) = result
-
-    print(f"train_coeffs: {train_coeffs.shape}")
-    print(f"val_coeffs: {val_coeffs.shape}")
-    print(f"test_coeffs: {test_coeffs.shape}")
-    print(f"train_y: {train_y.shape}")
-    print(f"val_y: {val_y.shape}")
-    print(f"test_y: {test_y.shape}")
-    print(f"train_final_index: {train_final_index.shape}")
-    print(f"val_final_index: {val_final_index.shape}")
-    print(f"test_final_index: {test_final_index.shape}")

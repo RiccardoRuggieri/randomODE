@@ -4,9 +4,9 @@ import numpy as np
 import pathlib
 import torch
 import tqdm
-import os
 
-import model.neuralsde_forecasting as models
+
+import model.forecasting.neuralsde_forecasting as models
 
 here = pathlib.Path(__file__).resolve().parent
 
