@@ -65,7 +65,7 @@ def main_GAN_training():
     # generator ------> discriminator
     # Important remark: the discriminator is a neuralCDE, so we need to append
     # times as a separate channel to the inputs
-    discriminator = neuralsde_regression.Discriminator(input_dim=output_dim,
+    discriminator = neuralsde_regression.Discriminator(input_dim=1,
                                                         hidden_dim=hidden_dim,
                                                         mlp_size=16,
                                                         num_layers=1)

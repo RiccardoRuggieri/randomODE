@@ -51,20 +51,23 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_trues = torch.cat(all_trues, dim=0)
 
             ## plotting
-            # num_samples = 5
-            #
-            # plt.figure(figsize=(8, 4))
-            # for i in range(num_samples):
-            #     plt.plot(all_trues[i].numpy(), color='r')
-            #     plt.plot(all_preds[i].numpy(), color='b')
-            # plt.xlabel('Time')
-            # plt.ylabel('Value')
-            # plt.ylim(-0.75,1.25)
-            # plt.title('Model Predictions vs True Values')
-            # plt.show()
+            num_samples = 5
+
+            plt.figure(figsize=(8, 4))
+            for i in range(num_samples):
+                plt.plot(all_trues[i].numpy(), color='r')
+                plt.plot(all_preds[i].numpy(), color='b')
+            plt.xlabel('Time')
+            plt.ylabel('Value')
+            plt.ylim(-0.75,1.25)
+            plt.title('Model Predictions vs True Values')
+            plt.show()
 
     return all_preds, all_trues
 
+
+# GAN training - when training a neural SDE model with a discriminator, computational cost increases
+# because you also have the CDE solve. On the other hand, the model is more interpretable
 def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_loader, device, criterion, batch_size):
     global all_preds, all_trues
 
@@ -104,7 +107,7 @@ def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_l
         generator.train()
         discriminator.train()
 
-        total_loss = 0
+        total_loss_GAN = 0
 
         for batch in train_loader:
             coeffs = batch[1].to(device)
@@ -116,20 +119,19 @@ def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_l
             # now a little bit of data formatting to get the discriminator work
             times = times.unsqueeze(0).unsqueeze(-1).expand(batch_size, times.size(0), 1)
             generated_samples = torchcde.linear_interpolation_coeffs(torch.cat([times, generated_samples], dim=2))
-            print(generated_samples.shape)
 
             generated_score = discriminator(generated_samples)
 
-            # todo: ############### resolve this issue ################
-            real_samples = next(infinite_train_dataloader)
-            # again some data formatting
-            print(real_samples.shape)
-            real_samples = torchcde.linear_interpolation_coeffs(torch.cat([times, real_samples], dim=2))
+            # real_samples = next(infinite_train_dataloader)[0].to(device)
+            # todo: problem here
+
 
             real_score = discriminator(real_samples)
 
             loss = generated_score - real_score
             loss.backward()
+
+            total_loss_GAN += loss.item()
 
             for param in generator.parameters():
                 param.grad *= -1
@@ -157,7 +159,8 @@ def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_l
 
 
         if epoch % 10 == 0:
-            avg_loss = total_loss / len(train_loader)
+
+            avg_loss = total_loss_GAN / len(train_loader)
             print(f'Epoch {epoch}, Loss: {avg_loss}')
 
             # evaluation for visualization purposes
@@ -186,21 +189,21 @@ def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_l
             all_trues = torch.cat(all_trues, dim=0)
 
             ## plotting
-            # num_samples = 5
-            #
-            # plt.figure(figsize=(8, 4))
-            # for i in range(num_samples):
-            #     plt.plot(all_trues[i].numpy(), color='r')
-            #     plt.plot(all_preds[i].numpy(), color='b')
-            # plt.xlabel('Time')
-            # plt.ylabel('Value')
-            # plt.ylim(-0.75,1.25)
-            # plt.title('Model Predictions vs True Values')
-            # plt.show()
+            num_samples = 5
+
+            plt.figure(figsize=(8, 4))
+            for i in range(num_samples):
+                plt.plot(all_trues[i].numpy(), color='r')
+                plt.plot(all_preds[i].numpy(), color='b')
+            plt.xlabel('Time')
+            plt.ylabel('Value')
+            plt.ylim(-0.75,1.25)
+            plt.title('Model Predictions vs True Values')
+            plt.show()
 
     # end of training
-    generator.load_state_dict(averaged_generator.module.state_dict())
-    discriminator.load_state_dict(averaged_discriminator.module.state_dict())
+    # generator.load_state_dict(averaged_generator.module.state_dict())
+    # discriminator.load_state_dict(averaged_discriminator.module.state_dict())
 
     return all_preds, all_trues
 
@@ -216,3 +219,4 @@ def evaluate_loss(ts, batch_size, dataloader, generator, discriminator):
             total_samples += batch_size
             total_loss += loss.item() * batch_size
     return total_loss / total_samples
+

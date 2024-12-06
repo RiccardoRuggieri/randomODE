@@ -118,7 +118,7 @@ class Discriminator(torch.nn.Module):
     def __init__(self, input_dim, hidden_dim, mlp_size, num_layers):
         super().__init__()
 
-        self._initial = MLP(1 + input_dim, hidden_dim, mlp_size, num_layers, tanh=False)
+        self._initial = MLP(input_dim + 1, hidden_dim, mlp_size, num_layers, tanh=False)
         self._func = DiscriminatorFunc(input_dim, hidden_dim, mlp_size, num_layers)
         self._readout = torch.nn.Linear(hidden_dim, 1)
 
