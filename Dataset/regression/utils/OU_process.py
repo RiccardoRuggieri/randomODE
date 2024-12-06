@@ -124,11 +124,11 @@ def get_data():
     train_loader, test_loader = create_data_loaders(train_data, train_coeffs, test_data, test_coeffs, config['batch_size'])
 
     # Plot the first sample for verification
-    plt.plot(times.numpy(), total_data[0, :, 1].numpy())
-    plt.xlabel('Time')
-    plt.ylabel('Value')
-    plt.title('OU Process Sample Path')
-    plt.grid('on')
-    plt.show()
+    # plt.plot(times.numpy(), total_data[0, :, 1].numpy())
+    # plt.xlabel('Time')
+    # plt.ylabel('Value')
+    # plt.title('OU Process Sample Path')
+    # plt.grid('on')
+    # plt.show()
 
-    return train_loader, test_loader
+    return train_loader, test_loader, config['batch_size']
