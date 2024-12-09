@@ -1,7 +1,9 @@
 import model.regression.neuralsde_regression as neuralsde_regression
+import model.regression.easy_flow_matching_regression as easy_flow_matching_regression
+import model.regression.flow_matching_regression as flow_matching_regression
 import torch
 import torch.optim as optim
-from common.regression.trainer_regression import _train_loop, _train_loop_asGAN
+from common.regression.trainer_regression import _train_loop, _train_loop_flow_match, _train_loop_asGAN
 import Dataset.regression.utils.OU_process as OU_process
 from common.regression.utils import show_distribution_comparison
 
@@ -19,23 +21,38 @@ def main_classical_training():
     device = torch.device("cuda" if use_cuda else "cpu")
 
 
-    model = neuralsde_regression.Generator(input_dim=input_dim,
+    model1 = neuralsde_regression.Generator(input_dim=input_dim,
                       hidden_dim=hidden_dim,
                       output_dim=output_dim,
                       num_layers=num_layers,
                       vector_field=neuralsde_regression.GeneratorFunc).to(device)
 
+    model2 = easy_flow_matching_regression.Generator(input_dim=input_dim,
+                                              hidden_dim=hidden_dim,
+                                              output_dim=output_dim,
+                                              num_layers=num_layers,
+                                              vector_field=easy_flow_matching_regression.GeneratorFunc).to(device)
+
+    model3 = flow_matching_regression.Generator(input_dim=input_dim,
+                                                    hidden_dim=hidden_dim,
+                                                    output_dim=output_dim,
+                                                    num_layers=num_layers,
+                                                    vector_field=flow_matching_regression.GeneratorFunc).to(device)
+
+
     num_epochs = 1000
     lr = 1e-3
 
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model2.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
     train_loader, test_loader, _ = OU_process.get_data()
 
     # Here we train the model
-    all_preds, all_trues = _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    #all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+
+    _train_loop_flow_match(model3, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # Show some stats at the end of the training
     # show_distribution_comparison(all_preds, all_trues)
@@ -93,7 +110,7 @@ def main_GAN_training():
 
 if __name__ == '__main__':
     # choose between "GAN" and "classical" for the training method
-    your_choice = "GAN"
+    your_choice = "classical"
     if your_choice == "GAN":
         main_GAN_training()
     elif your_choice == "classical":

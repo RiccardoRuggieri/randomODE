@@ -41,6 +41,9 @@ def generate_data(num_samples, T, N, theta, mu, sigma, X0):
     total_data = torch.Tensor(np.array(data_list))  # [Batch size, Dimension, Length]
     total_data = total_data.permute(0, 2, 1)  # [Batch size, Length, Dimension]
 
+    # normalize the data
+    total_data = (total_data - total_data.mean()) / total_data.std()
+
     max_len = total_data.shape[1]
     times = torch.linspace(0, 1, max_len)
     coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(total_data, times)

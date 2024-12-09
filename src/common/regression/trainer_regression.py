@@ -59,9 +59,93 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
                 plt.plot(all_preds[i].numpy(), color='b')
             plt.xlabel('Time')
             plt.ylabel('Value')
-            plt.ylim(-0.75,1.25)
+            plt.ylim(-1.25,1.25)
             plt.title('Model Predictions vs True Values')
             plt.show()
+
+    return all_preds, all_trues
+
+
+import matplotlib.pyplot as plt
+
+def _train_loop_flow_match(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
+    for epoch in range(1, num_epochs + 1):
+        model.train()
+        total_loss = 0
+        for batch in train_loader:
+            # Prepare data
+            coeffs = batch[1].to(device)
+            true = batch[0][:, :, 1].to(device)  # True values to match
+            times = torch.linspace(0, 1, batch[0].shape[1], device=device)
+
+            optimizer.zero_grad()
+
+            # Forward pass
+            pred = model(coeffs, times).squeeze(-1)  # Ensure shape [batch_size, seq_len]
+
+            # Flow matching loss
+            flow_loss = 0
+            num_steps = pred.shape[1]  # Sequence length
+            for step in range(num_steps):
+                t = times[step].repeat(pred.shape[0], 1)  # Batch of time values
+                y = pred[:, step].unsqueeze(-1)  # Extract predictions for this time step, shape [batch_size]
+
+                # todo: you cannot access directly the model.func.f and model.func.g
+                # you need to implement a separated forward for func module
+
+                deterministic = model.func.forward_f(t, y)  # Evaluate f
+                noise = torch.randn_like(y).to(device)  # Gaussian noise
+                stochastic = model.func.forward_g(t, y) * noise  # Evaluate g
+                flow_loss += ((deterministic + stochastic - true[:, step].unsqueeze(-1)) ** 2).mean()
+
+            flow_loss /= num_steps  # Average over time steps
+
+            # Backpropagation
+            flow_loss.backward()
+            optimizer.step()
+            total_loss += flow_loss.item()
+
+        print(f'Epoch {epoch}/{num_epochs}, Train Loss: {total_loss / len(train_loader)}')
+
+        # Evaluation loop
+        model.eval()
+        total_loss = 0
+        all_preds = []
+        all_trues = []
+
+        with torch.no_grad():
+            for batch in test_loader:
+                coeffs = batch[1].to(device)
+                true = batch[0][:, :, 1].to(device)
+                times = torch.linspace(0, 1, batch[0].shape[1], device=device)
+
+                pred = model(coeffs, times).squeeze(-1)
+
+                # Test loss (optional criterion can be applied here for evaluation)
+                loss = ((pred - true) ** 2).mean()
+                total_loss += loss.item()
+
+                all_preds.append(pred.cpu())
+                all_trues.append(true.cpu())
+
+            avg_loss = total_loss / len(test_loader)
+            print(f'Epoch {epoch}/{num_epochs}, Test Loss: {avg_loss}')
+
+        # Visualize some predictions
+        all_preds = torch.cat(all_preds, dim=0)
+        all_trues = torch.cat(all_trues, dim=0)
+
+        num_samples = min(5, len(all_preds))  # Plot up to 5 samples
+        plt.figure(figsize=(8, 4))
+        for i in range(num_samples):
+            plt.plot(all_trues[i].numpy(), color='r', label='True' if i == 0 else "")
+            plt.plot(all_preds[i].numpy(), color='b', label='Pred' if i == 0 else "")
+        plt.xlabel('Time')
+        plt.ylabel('Value')
+        plt.ylim(-2, 2)
+        plt.title('Model Predictions vs True Values')
+        plt.legend()
+        plt.show()
 
     return all_preds, all_trues
 
@@ -70,9 +154,6 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 # because you also have the CDE solve. On the other hand, the model is more interpretable
 def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_loader, device, criterion, batch_size):
     global all_preds, all_trues
-
-    # we define a particular train loader for the discriminator
-    infinite_train_dataloader = (elem for it in iter(lambda: train_loader, None) for elem in it)
 
     # Weight averaging improve GAN training.
     averaged_generator = swa_utils.AveragedModel(generator)
@@ -122,9 +203,8 @@ def _train_loop_asGAN(generator, discriminator, num_epochs, train_loader, test_l
 
             generated_score = discriminator(generated_samples)
 
-            # real_samples = next(infinite_train_dataloader)[0].to(device)
             # todo: problem here
-
+            # Format real samples for the discriminator
 
             real_score = discriminator(real_samples)
 
