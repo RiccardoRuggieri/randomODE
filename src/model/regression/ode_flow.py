@@ -66,12 +66,13 @@ class GeneratorFunc(nn.Module):
         tt = self.linear_in(torch.cat((t, y), dim=-1))
         return self.g_net(tt)
 
-
 class Generator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, activation='lipswish', vector_field=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, vector_field=None):
         super(Generator, self).__init__()
-        self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
+        self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation='lipswish')
+        # encoder
         self.initial = nn.Linear(input_dim, hidden_dim)
+        # decoder
         self.decoder = nn.Linear(hidden_dim, output_dim)
 
     def dynamics(self, t, y, inject_noise, noise_fn=None):
@@ -79,26 +80,62 @@ class Generator(nn.Module):
         if inject_noise:
             if noise_fn is None:
                 noise_fn = torch.randn_like  # Default to Gaussian noise
-            noise = noise_fn(y).to(y.device) # Apply the noise function
+            noise = noise_fn(y).to(y.device)  # Apply the noise function
             stochastic = self.func.g(t, y) * noise
             return deterministic + stochastic
         return deterministic
 
     def forward(self, coeffs, times, inject_noise=True):
         self.func.set_X(coeffs, times)
-        y0 = self.func.X.evaluate(times)
-        y0 = self.initial(y0)[:, 0, :]
+        y0 = self.func.X.evaluate(times)  # Cubic spline interpolation of input coefficients
+        z0 = self.initial(y0)[:, 0, :]  # Initial embedding of data (z0)
 
         z = odeint(
             lambda t, y: self.dynamics(t, y, inject_noise),
-            y0,
+            z0,
             times,
-            method='euler', #rk4
+            method='euler',  # Use Euler solver for integration
             options={"step_size": 0.05}
         )
 
-        z = z.permute(1, 0, 2)
-
+        z = z.permute(1, 0, 2)  # Reshape for batch processing
         return self.decoder(z)
+
+    def interpolate_and_predict_velocity(self, coeffs, true, t):
+        """
+        Compute interpolation and velocity for flow matching loss.
+
+        Args:
+        - coeffs: Input coefficients (z0 embeddings)
+        - true: Ground truth labels (z1 embeddings)
+        - t: Random time steps for interpolation
+
+        Returns:
+        - zt: Interpolated embeddings at time t
+        - vt: Ground truth velocities
+        - predicted_vt: Predicted velocities at time t
+        """
+        # Ensure that the coefficients and times are properly set for cubic spline
+        times = torch.linspace(0, 1, coeffs.size(1), device=coeffs.device)
+        self.func.set_X(coeffs, times)
+
+        # Compute embeddings for data (z0) and labels (z1)
+        z0 = self.initial(self.func.X.evaluate(times[0]))  # Initial embedding
+        # ????
+        z1 = self.forward(coeffs, times)  # Final embedding (encoded labels)
+
+        # Reshape t to allow broadcasting
+        t = t.view(-1, 1, 1)  # Shape: (batch_size, 1, 1)
+
+        # Interpolate between z0 and z1
+        zt = (1 - t) * z0.unsqueeze(1) + t * z1.unsqueeze(1)  # Interpolated embeddings
+        # ????
+        vt = z1 - z0  # Ground truth velocity
+
+        # Predict velocity at interpolated embeddings
+        t_scalar = t.squeeze(-1)  # Extract scalar times for passing to `f`
+        predicted_vt = self.func.f(t_scalar, zt.squeeze(1))  # Evaluate f at interpolated points
+
+        return zt.squeeze(1), vt, predicted_vt
 
 

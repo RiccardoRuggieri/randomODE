@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.optim.swa_utils as swa_utils
 import torchcde
+import torch.nn.functional as F
 
 
 def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
@@ -22,7 +23,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
             total_loss += loss.item()
 
-        if epoch % 10 == 0:
+        if epoch % 50 == 0:
             avg_loss = total_loss / len(train_loader)
             print(f'Epoch {epoch}, Loss: {avg_loss}')
 
@@ -66,88 +67,45 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
     return all_preds, all_trues
 
 
-import matplotlib.pyplot as plt
-
-def _train_loop_flow_match(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
+def train_flow_matching(model, optimizer, num_epochs, train_loader, device, criterion, lambda_flow=1.0, lambda_label=1.0):
     for epoch in range(1, num_epochs + 1):
         model.train()
-        total_loss = 0
-        for batch in train_loader:
-            # Prepare data
-            coeffs = batch[1].to(device)
-            true = batch[0][:, :, 1].to(device)  # True values to match
-            times = torch.linspace(0, 1, batch[0].shape[1], device=device)
+        total_task_loss, total_flow_loss, total_label_ae_loss = 0, 0, 0
 
+        for batch in train_loader:
+            # Ensure batch contains data and labels
+            true, coeffs = batch[0][:, :, 1].to(device), batch[1].to(device)
             optimizer.zero_grad()
 
-            # Forward pass
-            pred = model(coeffs, times).squeeze(-1)  # Ensure shape [batch_size, seq_len]
+            # Task Loss
+            times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
+            pred = model(coeffs, times).squeeze(-1)  # Forward pass with noise injection
+            task_loss = criterion(pred, true)
 
-            # Flow matching loss
-            flow_loss = 0
-            num_steps = pred.shape[1]  # Sequence length
-            for step in range(num_steps):
-                t = times[step].repeat(pred.shape[0], 1)  # Batch of time values
-                y = pred[:, step].unsqueeze(-1)  # Extract predictions for this time step, shape [batch_size]
+            # Flow Matching Loss and Velocity Prediction
+            t = torch.rand(coeffs.size(0), device=device)  # Random time samples
+            zt, vt, predicted_vt = model.interpolate_and_predict_velocity(coeffs, true, t)
+            flow_loss = F.mse_loss(predicted_vt, vt)
 
-                # todo: you cannot access directly the model.func.f and model.func.g
-                # you need to implement a separated forward for func module
+            # Label Autoencoding Loss
+            z1 = model.label_encoder(true)
+            reconstructed_label = model.label_decoder(z1)
+            label_ae_loss = F.mse_loss(reconstructed_label, true)
 
-                deterministic = model.func.forward_f(t, y)  # Evaluate f
-                noise = torch.randn_like(y).to(device)  # Gaussian noise
-                stochastic = model.func.forward_g(t, y) * noise  # Evaluate g
-                flow_loss += ((deterministic + stochastic - true[:, step].unsqueeze(-1)) ** 2).mean()
-
-            flow_loss /= num_steps  # Average over time steps
-
-            # Backpropagation
-            flow_loss.backward()
+            # Total Loss
+            total_loss = task_loss + lambda_flow * flow_loss + lambda_label * label_ae_loss
+            total_loss.backward()
             optimizer.step()
-            total_loss += flow_loss.item()
 
-        print(f'Epoch {epoch}/{num_epochs}, Train Loss: {total_loss / len(train_loader)}')
+            # Update metrics
+            total_task_loss += task_loss.item()
+            total_flow_loss += flow_loss.item()
+            total_label_ae_loss += label_ae_loss.item()
 
-        # Evaluation loop
-        model.eval()
-        total_loss = 0
-        all_preds = []
-        all_trues = []
+        # Print epoch metrics
+        print(f"Epoch {epoch}: Task Loss: {total_task_loss:.4f}, Flow Loss: {total_flow_loss:.4f}, Label AE Loss: {total_label_ae_loss:.4f}")
 
-        with torch.no_grad():
-            for batch in test_loader:
-                coeffs = batch[1].to(device)
-                true = batch[0][:, :, 1].to(device)
-                times = torch.linspace(0, 1, batch[0].shape[1], device=device)
 
-                pred = model(coeffs, times).squeeze(-1)
-
-                # Test loss (optional criterion can be applied here for evaluation)
-                loss = ((pred - true) ** 2).mean()
-                total_loss += loss.item()
-
-                all_preds.append(pred.cpu())
-                all_trues.append(true.cpu())
-
-            avg_loss = total_loss / len(test_loader)
-            print(f'Epoch {epoch}/{num_epochs}, Test Loss: {avg_loss}')
-
-        # Visualize some predictions
-        all_preds = torch.cat(all_preds, dim=0)
-        all_trues = torch.cat(all_trues, dim=0)
-
-        num_samples = min(5, len(all_preds))  # Plot up to 5 samples
-        plt.figure(figsize=(8, 4))
-        for i in range(num_samples):
-            plt.plot(all_trues[i].numpy(), color='r', label='True' if i == 0 else "")
-            plt.plot(all_preds[i].numpy(), color='b', label='Pred' if i == 0 else "")
-        plt.xlabel('Time')
-        plt.ylabel('Value')
-        plt.ylim(-2, 2)
-        plt.title('Model Predictions vs True Values')
-        plt.legend()
-        plt.show()
-
-    return all_preds, all_trues
 
 
 # GAN training - when training a neural SDE model with a discriminator, computational cost increases

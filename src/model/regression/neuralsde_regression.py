@@ -79,7 +79,6 @@ class Generator(nn.Module):
 
     def forward(self, coeffs, times):
         # control module
-        print(times.shape)
         self.func.set_X(coeffs, times)
 
         y0 = self.func.X.evaluate(times)
