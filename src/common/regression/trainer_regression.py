@@ -84,7 +84,7 @@ def train_flow_matching(model, optimizer, num_epochs, train_loader, device, crit
 
             # Flow Matching Loss and Velocity Prediction
             t = torch.rand(coeffs.size(0), device=device)  # Random time samples
-            zt, vt, predicted_vt = model.interpolate_and_predict_velocity(coeffs, true, t)
+            zt, vt, predicted_vt = model.interpolate_and_predict_velocity(coeffs, t, batch)
             flow_loss = F.mse_loss(predicted_vt, vt)
 
             # Label Autoencoding Loss

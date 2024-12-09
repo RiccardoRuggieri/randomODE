@@ -101,7 +101,7 @@ class Generator(nn.Module):
         z = z.permute(1, 0, 2)  # Reshape for batch processing
         return self.decoder(z)
 
-    def interpolate_and_predict_velocity(self, coeffs, true, t):
+    def interpolate_and_predict_velocity(self, coeffs, t, batch):
         """
         Compute interpolation and velocity for flow matching loss.
 
@@ -116,26 +116,34 @@ class Generator(nn.Module):
         - predicted_vt: Predicted velocities at time t
         """
         # Ensure that the coefficients and times are properly set for cubic spline
-        times = torch.linspace(0, 1, coeffs.size(1), device=coeffs.device)
+        times = torch.linspace(0, 1, batch[0].shape[1], device=coeffs.device)
         self.func.set_X(coeffs, times)
+        y0 = self.func.X.evaluate(times)
 
         # Compute embeddings for data (z0) and labels (z1)
-        z0 = self.initial(self.func.X.evaluate(times[0]))  # Initial embedding
-        # ????
-        z1 = self.forward(coeffs, times)  # Final embedding (encoded labels)
+        z0 = self.initial(y0)[:, 0, :]
+        z1 = odeint(
+            lambda u, y: self.dynamics(u, y, inject_noise=False),
+            z0,
+            times,
+            method='euler',  # Use Euler solver for integration
+            options={"step_size": 0.05}
+        )  # Final embedding (encoded labels)
 
         # Reshape t to allow broadcasting
         t = t.view(-1, 1, 1)  # Shape: (batch_size, 1, 1)
 
         # Interpolate between z0 and z1
-        zt = (1 - t) * z0.unsqueeze(1) + t * z1.unsqueeze(1)  # Interpolated embeddings
+        z_t = (1 - t) * z0.unsqueeze(1) + t * z1.unsqueeze(1)  # Interpolated embeddings
         # ????
         vt = z1 - z0  # Ground truth velocity
 
+        # todo: problem here: how do you compute the predicted velocity?
+
         # Predict velocity at interpolated embeddings
         t_scalar = t.squeeze(-1)  # Extract scalar times for passing to `f`
-        predicted_vt = self.func.f(t_scalar, zt.squeeze(1))  # Evaluate f at interpolated points
+        predicted_vt = self.dynamics(t_scalar, z_t, inject_noise=True)  # Evaluate f at interpolated points
 
-        return zt.squeeze(1), vt, predicted_vt
+        return z_t.squeeze(1), vt, predicted_vt
 
 
