@@ -1,12 +1,12 @@
 import model.regression.neuralsde_regression as neuralsde_regression
-import model.regression.easy_flow_matching_regression as easy_flow_matching_regression
+import model.classification.easy_flow_matching_regression as easy_flow_matching_regression
 import model.regression.flow_matching_regression as flow_matching_regression
 import model.regression.ode_flow as ode_flow
 import torch
 import torch.optim as optim
-from common.regression.trainer_regression import _train_loop, train_flow_matching, _train_loop_asGAN
+from common.regression.trainer_regression import train_flow_matching, _train_loop_asGAN
 import Dataset.regression.utils.OU_process as OU_process
-from common.regression.utils import show_distribution_comparison
+
 
 def main_classical_training():
     """
@@ -29,10 +29,10 @@ def main_classical_training():
                       vector_field=neuralsde_regression.GeneratorFunc).to(device)
 
     model2 = easy_flow_matching_regression.Generator(input_dim=input_dim,
-                                              hidden_dim=hidden_dim,
-                                              output_dim=output_dim,
-                                              num_layers=num_layers,
-                                              vector_field=easy_flow_matching_regression.GeneratorFunc).to(device)
+                                                     hidden_dim=hidden_dim,
+                                                     output_dim=output_dim,
+                                                     num_layers=num_layers,
+                                                     vector_field=easy_flow_matching_regression.GeneratorFunc).to(device)
 
     model3 = flow_matching_regression.Generator(input_dim=input_dim,
                                                     hidden_dim=hidden_dim,
@@ -57,9 +57,9 @@ def main_classical_training():
     train_loader, test_loader, _ = OU_process.get_data()
 
     # Here we train the model
-    # all_preds, all_trues = _train_loop(model3, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    #all_preds, all_trues = _train_loop(model4, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
-    all_preds, all_trues = train_flow_matching(model4, optimizer, num_epochs, train_loader, device, criterion)
+    train_flow_matching(model4, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # Show some stats at the end of the training
     # show_distribution_comparison(all_preds, all_trues)

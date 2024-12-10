@@ -67,43 +67,80 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
     return all_preds, all_trues
 
 
-def train_flow_matching(model, optimizer, num_epochs, train_loader, device, criterion, lambda_flow=1.0, lambda_label=1.0):
+def train_flow_matching(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, lambda_flow=1.0, lambda_label=1.0):
     for epoch in range(1, num_epochs + 1):
         model.train()
-        total_task_loss, total_flow_loss, total_label_ae_loss = 0, 0, 0
+        total_task_loss, total_flow_loss = 0, 0
 
         for batch in train_loader:
-            # Ensure batch contains data and labels
-            true, coeffs = batch[0][:, :, 1].to(device), batch[1].to(device)
             optimizer.zero_grad()
 
-            # Task Loss
+            true, coeffs = batch[0][:, :, 1].to(device), batch[1].to(device)  # Inputs and labels
             times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
-            pred = model(coeffs, times).squeeze(-1)  # Forward pass with noise injection
-            task_loss = criterion(pred, true)
 
-            # Flow Matching Loss and Velocity Prediction
-            t = torch.rand(coeffs.size(0), device=device)  # Random time samples
-            zt, vt, predicted_vt = model.interpolate_and_predict_velocity(coeffs, t, batch)
+            # Task Loss
+            if epoch % 10 == 0:
+                pred = model(coeffs, times).squeeze(-1)  # Forward pass
+                task_loss = criterion(pred, true)
+
+            t1 = torch.rand(1, device=device)  # Random time steps
+            t2 = torch.rand(1, device=device)
+            z_t, vt, predicted_vt = model.interpolate_and_predict_velocity(coeffs, t1, t2, true)
             flow_loss = F.mse_loss(predicted_vt, vt)
 
-            # Label Autoencoding Loss
-            z1 = model.label_encoder(true)
-            reconstructed_label = model.label_decoder(z1)
-            label_ae_loss = F.mse_loss(reconstructed_label, true)
-
             # Total Loss
-            total_loss = task_loss + lambda_flow * flow_loss + lambda_label * label_ae_loss
+            if epoch % 10 == 0:
+                total_loss = flow_loss + task_loss
+                total_task_loss += task_loss.item()
+            else:
+                total_loss = flow_loss
             total_loss.backward()
             optimizer.step()
 
-            # Update metrics
-            total_task_loss += task_loss.item()
+            # Accumulate losses
             total_flow_loss += flow_loss.item()
-            total_label_ae_loss += label_ae_loss.item()
 
-        # Print epoch metrics
-        print(f"Epoch {epoch}: Task Loss: {total_task_loss:.4f}, Flow Loss: {total_flow_loss:.4f}, Label AE Loss: {total_label_ae_loss:.4f}")
+        if epoch % 200 == 0:
+            ## evaluation
+            model.eval()
+            total_loss_eval = 0
+            all_preds = []
+            all_trues = []
+            with torch.no_grad():
+                for batch in test_loader:
+                    coeffs = batch[1].to(device)
+                    times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
+
+                    true = batch[0][:, :, 1].to(device)
+                    pred = model(coeffs, times).squeeze(-1)
+                    loss = criterion(pred, true)
+                    total_loss_eval += loss.item()
+
+                    all_preds.append(pred.cpu())
+                    all_trues.append(true.cpu())
+
+            avg_loss = total_loss_eval / len(test_loader)
+            print(f'Test Loss: {avg_loss}')
+
+            all_preds = torch.cat(all_preds, dim=0)
+            all_trues = torch.cat(all_trues, dim=0)
+
+            ## plotting
+            num_samples = 5
+
+            plt.figure(figsize=(8, 4))
+            for i in range(num_samples):
+                plt.plot(all_trues[i].numpy(), color='r')
+                plt.plot(all_preds[i].numpy(), color='b')
+            plt.xlabel('Time')
+            plt.ylabel('Value')
+            plt.ylim(-1.25,1.25)
+            plt.title('Model Predictions vs True Values')
+            plt.show()
+
+        if (epoch % 10 == 0):
+            # Epoch summary
+            print(f"Epoch {epoch}: Task Loss: {total_task_loss:.4f}, Flow Loss: {total_flow_loss:.4f}")
 
 
 

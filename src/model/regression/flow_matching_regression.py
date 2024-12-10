@@ -66,7 +66,6 @@ class GeneratorFunc(nn.Module):
         tt = self.linear_in(torch.cat((t, y), dim=-1))
         return self.g_net(tt)
 
-
 class Generator(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers, activation='lipswish', vector_field=None):
         super(Generator, self).__init__()
@@ -84,7 +83,7 @@ class Generator(nn.Module):
             return deterministic + stochastic
         return deterministic
 
-    def forward(self, coeffs, times, inject_noise=True):
+    def forward(self, coeffs, times, inject_noise=False):
         self.func.set_X(coeffs, times)
         y0 = self.func.X.evaluate(times)
         y0 = self.initial(y0)[:, 0, :]
@@ -93,7 +92,7 @@ class Generator(nn.Module):
             lambda t, y: self.dynamics(t, y, inject_noise),
             y0,
             times,
-            method='euler', #rk4
+            method='rk4',
             options={"step_size": 0.05}
         )
 

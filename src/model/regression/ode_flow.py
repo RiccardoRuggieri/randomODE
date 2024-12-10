@@ -70,80 +70,71 @@ class Generator(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers, vector_field=None):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation='lipswish')
-        # encoder
-        self.initial = nn.Linear(input_dim, hidden_dim)
-        # decoder
-        self.decoder = nn.Linear(hidden_dim, output_dim)
+        self.initial = nn.Linear(input_dim, hidden_dim)  # Encoder for inputs
+        self.decoder = nn.Linear(hidden_dim, output_dim)  # Decoder for outputs
 
-    def dynamics(self, t, y, inject_noise, noise_fn=None):
+    def dynamics(self, t, y, inject_noise=True, noise_fn=None):
         deterministic = self.func.f(t, y)
         if inject_noise:
             if noise_fn is None:
-                noise_fn = torch.randn_like  # Default to Gaussian noise
-            noise = noise_fn(y).to(y.device)  # Apply the noise function
+                noise_fn = torch.randn_like
+            noise = noise_fn(y).to(y.device)
             stochastic = self.func.g(t, y) * noise
             return deterministic + stochastic
         return deterministic
 
     def forward(self, coeffs, times, inject_noise=True):
         self.func.set_X(coeffs, times)
-        y0 = self.func.X.evaluate(times)  # Cubic spline interpolation of input coefficients
-        z0 = self.initial(y0)[:, 0, :]  # Initial embedding of data (z0)
+        y0 = self.func.X.evaluate(times)  # Interpolated data
+        z0 = self.initial(y0)[:, 0, :]  # Encode initial embeddings
 
         z = odeint(
             lambda t, y: self.dynamics(t, y, inject_noise),
             z0,
             times,
-            method='euler',  # Use Euler solver for integration
+            method='euler',
             options={"step_size": 0.05}
         )
-
         z = z.permute(1, 0, 2)  # Reshape for batch processing
         return self.decoder(z)
 
-    def interpolate_and_predict_velocity(self, coeffs, t, batch):
+    def interpolate_and_predict_velocity(self, coeffs, t1, t2, true_labels):
         """
-        Compute interpolation and velocity for flow matching loss.
-
+        Compute interpolations and velocity for flow matching.
         Args:
-        - coeffs: Input coefficients (z0 embeddings)
-        - true: Ground truth labels (z1 embeddings)
-        - t: Random time steps for interpolation
-
+        - coeffs: Input coefficients
+        - t: Random time steps
         Returns:
         - zt: Interpolated embeddings at time t
         - vt: Ground truth velocities
-        - predicted_vt: Predicted velocities at time t
+        - predicted_vt: Predicted velocities
         """
-        # Ensure that the coefficients and times are properly set for cubic spline
-        times = torch.linspace(0, 1, batch[0].shape[1], device=coeffs.device)
+
+        # Ensure the coefficients are prepared for interpolation
+        times = torch.linspace(0, 1, coeffs.shape[1], device=coeffs.device)
         self.func.set_X(coeffs, times)
         y0 = self.func.X.evaluate(times)
 
-        # Compute embeddings for data (z0) and labels (z1)
+        # Encode initial embedding (z0)
         z0 = self.initial(y0)[:, 0, :]
-        z1 = odeint(
-            lambda u, y: self.dynamics(u, y, inject_noise=False),
-            z0,
-            times,
-            method='euler',  # Use Euler solver for integration
-            options={"step_size": 0.05}
-        )  # Final embedding (encoded labels)
+        # sampling at time t through f
+        z_t1 = self.dynamics(t1.squeeze(), z0, inject_noise=False)
+        z_t2 = self.dynamics(t2.squeeze(), z0, inject_noise=False)
 
-        # Reshape t to allow broadcasting
-        t = t.view(-1, 1, 1)  # Shape: (batch_size, 1, 1)
+        # Predicted velocity
+        predicted_vt_1 = self.dynamics(t1.squeeze(), z_t1, inject_noise=False)
+        predicted_vt_2 = self.dynamics(t2.squeeze(), z_t2, inject_noise=False)
 
-        # Interpolate between z0 and z1
-        z_t = (1 - t) * z0.unsqueeze(1) + t * z1.unsqueeze(1)  # Interpolated embeddings
-        # ????
-        vt = z1 - z0  # Ground truth velocity
+        if t1.squeeze() < t2.squeeze():
+            v_t = (z_t2 - z_t1) / (t2 - t1)
+            predicted_vt = (predicted_vt_2 - predicted_vt_1) / (t2 - t1)
+            z_t = z_t1
+        else:
+            v_t = (z_t1 - z_t2) / (t1 - t2)
+            predicted_vt = (predicted_vt_1 - predicted_vt_2) / (t1 - t2)
+            z_t = z_t2
 
-        # todo: problem here: how do you compute the predicted velocity?
+        return z_t, v_t, predicted_vt
 
-        # Predict velocity at interpolated embeddings
-        t_scalar = t.squeeze(-1)  # Extract scalar times for passing to `f`
-        predicted_vt = self.dynamics(t_scalar, z_t, inject_noise=True)  # Evaluate f at interpolated points
-
-        return z_t.squeeze(1), vt, predicted_vt
 
 
