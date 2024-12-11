@@ -5,13 +5,13 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
         model.train()
         total_loss = 0
         for batch in train_loader:
-            inputs, labels = batch[1].to(device), batch[2].to(device).unsqueeze(-1)
+            coeffs, labels = batch[1].to(device), batch[2].to(device)
             times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
 
             optimizer.zero_grad()
 
             # Forward pass
-            logits = model(inputs, times)  # Include the 'times' argument
+            logits = model(coeffs, times)  # Include the 'times' argument
             loss = criterion(logits, labels)
 
             # Backward pass
@@ -31,7 +31,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_trues = []
             with torch.no_grad():
                 for batch in test_loader:
-                    inputs, labels = batch[1].to(device), batch[2].to(device).unsqueeze(-1)
+                    inputs, labels = batch[1].to(device), batch[2].to(device)
                     times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
 
                     logits = model(inputs, times)  # Include the 'times' argument
@@ -55,8 +55,9 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
             # Plot sample predictions
             num_samples = 5
-            print("Sample Predictions:")
-            for i in range(num_samples):
+            print("Sample Random Predictions:")
+            # todo: fix a random number between 0 and len(all_preds) - 1
+            for i  in range(num_samples):
                 print(f"True: {all_trues[i].item()}, Pred: {all_preds[i].item()}")
 
     return all_preds, all_trues

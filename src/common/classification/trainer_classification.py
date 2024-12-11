@@ -76,6 +76,7 @@ def _evaluate_metrics(dataloader, model, times, loss_fn, num_classes, device, kw
             total_confusion += sklearn.metrics.confusion_matrix(true_y_cpu, thresholded_y_cpu,
                                                                 labels=range(num_classes))
             total_dataset_size += batch_size
+            print(pred_y.shape, true_y.shape)
             total_loss += loss_fn(pred_y, true_y) * batch_size
 
         total_loss /= total_dataset_size  # assume 'mean' reduction in the loss function
