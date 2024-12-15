@@ -23,6 +23,7 @@ class NeuralSDE(torch.nn.Module):
         if z0 is None:
             assert self.initial, "Was not expecting to be given no value of z0."
             z0 = self.initial_network(self.func.X.evaluate(times[0]))
+            print(z0.shape)
         
         # Figure out what times we need to solve for
         if stream:

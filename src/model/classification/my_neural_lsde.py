@@ -67,6 +67,7 @@ class NeuralSDE(torch.nn.Module):
         else:
             # final_index is a tensor of shape (...)
             # z_t is a tensor of shape (times, ..., channels)
+            final_index = torch.tensor([len(times) - 1], device=z_t.device)
             final_index_indices = final_index.unsqueeze(-1).expand(z_t.shape[1:]).unsqueeze(0)
             z_t = z_t.gather(dim=0, index=final_index_indices).squeeze(0)
 

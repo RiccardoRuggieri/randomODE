@@ -18,7 +18,7 @@ def train_model(device='cuda', max_epochs=50, *,                                
 
     lr = 1e-3
 
-    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=512,
+    times, train_dataloader, val_dataloader, test_dataloader = MIT_BIH.get_data(batch_size=32,
                                                                                 segment_length=180,
                                                                                 sampling_rate=360)
 
@@ -50,7 +50,7 @@ def train_model(device='cuda', max_epochs=50, *,                                
 
 def run_all(device, model_names=['staticsde', 'naivesde', 'neurallsde', 'neurallnsde', 'neuralgsde']):
 
-    hidden = 32
+    hidden = 16
     num_layer = 1
 
 

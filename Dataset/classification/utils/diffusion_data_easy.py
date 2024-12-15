@@ -1,9 +1,8 @@
 import pathlib
 
-from Dataset.classification.utils import common
-
 import torch
-from torch.utils.data import Dataset, DataLoader
+import torchcde
+from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 
 # paths
@@ -23,14 +22,19 @@ class StochasticProcessDataset(Dataset):
         :param file_path: Path to the dataset file saved in .pt format.
         """
         dataset = torch.load(file_path)
-        self.data = dataset["data"].to(torch.float32)
+        self.data = dataset["data"]
+        self.coeffs = dataset["coeffs"]
         self.labels = dataset["labels"]
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx], self.labels[idx]
+        # Unpack the data correctly
+        path = self.data[idx]
+        coeffs = self.coeffs[idx]
+        label = self.labels[idx]
+        return path, coeffs, label
 
 
 def generate_stochastic_process_dataset(output_file, num_path_to_generate=10002, timesteps=100, dt=0.1, seed=42):
@@ -88,7 +92,7 @@ def generate_stochastic_process_dataset(output_file, num_path_to_generate=10002,
 
     num_classes = 3
     num_paths_per_class = num_path_to_generate // num_classes
-    data, labels = [], []
+    data, list_coeffs, labels = [], [], []
 
     process_generators = [generate_ou_process,
                           generate_cir_process,
@@ -96,86 +100,96 @@ def generate_stochastic_process_dataset(output_file, num_path_to_generate=10002,
 
     for i, generator in enumerate(process_generators):
         paths = generator(size=(num_paths_per_class, timesteps))
+        times = torch.linspace(0, 1, timesteps)
+        coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(paths.unsqueeze(-1), times)
+        list_coeffs.append(coeffs)
         data.append(paths)
         labels.extend([i] * num_paths_per_class)
 
-    data = torch.cat(data, dim=0)
+    data = torch.cat(data, dim=0)  # Concatenate all paths
+    coeffs = torch.cat(list_coeffs, dim=0)  # Concatenate all coeffs
     labels = torch.tensor(labels)
 
     indices = torch.randperm(num_path_to_generate)
     data = data[indices]
+    coeffs = coeffs[indices]
     labels = labels[indices]
 
-    dataset = {"data": data, "labels": labels}
+    dataset = {"data": data, "coeffs": coeffs, "labels": labels}
     torch.save(dataset, output_file)
 
 
-def get_data_loader(batch_size=32, file_path=None):
+def get_dataloaders(batch_size=32, train_ratio=0.8, file_path=None, seed=42):
+    """
+    Generates or loads a dataset, splits it into train and test, and returns dataloaders.
+    :param batch_size: Batch size for the dataloaders.
+    :param train_ratio: Ratio of training data.
+    :param file_path: Path to the dataset file in .pt format. If None, generates a new dataset.
+    :param seed: Seed for reproducibility.
+    :return: train_loader, test_loader
+    """
     if file_path is None:
         file_path = processed_data_loc / "stochastic_processes.pt"
-        processed_data_loc.mkdir(parents=True, exist_ok=True)
-        generate_stochastic_process_dataset(file_path)
+        generate_stochastic_process_dataset(file_path, seed=seed)
         plot_sample_paths(file_path)
 
+    # Initialize dataset and split
     dataset = StochasticProcessDataset(file_path)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    train_data, test_data = split_data(dataset, train_ratio)
+
+    # Create dataloaders
+    train_loader, test_loader = create_dataloaders(train_data, test_data, batch_size=batch_size)
+    return train_loader, test_loader
 
 
-def tensor_data(batch_size=32):
-    dataset = get_data_loader(batch_size)
-    # Extract X and y from the dataset
-    X_list = []
-    y_list = []
-    for batch in dataset:
-        X_batch, y_batch = batch
-        X_list.append(X_batch)
-        y_list.append(y_batch)
+def split_data(dataset, train_ratio=0.8):
+    total_size = len(dataset)
+    train_size = int(total_size * train_ratio)
+    test_size = total_size - train_size
 
-    # univariate time series, you must unsqueeze the last dimension
-    X = torch.cat(X_list, dim=0).unsqueeze(-1)
-    y = torch.cat(y_list, dim=0)
+    train_data, test_data = random_split(dataset, [train_size, test_size])
+    return train_data, test_data
 
-    # print(X.shape, y.shape)
 
-    return X, y
+def create_dataloaders(train_data, test_data, batch_size=16):
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
 
-def get_data(batch_size=32):
-    X, y = tensor_data(batch_size)
+def get_data():
+    """
+    Sets up the dataset and dataloaders for training and testing.
+    :return: train_loader, test_loader, batch_size
+    """
+    config = {
+        'seed': 42,
+        'train_ratio': 0.8,
+        'batch_size': 32,
+    }
 
-    # Generate times based on sampling rate and segment length
-    times = torch.linspace(0, X.size(1) - 1, X.size(1))
-    final_index = torch.tensor(X.size(1) - 1).repeat(X.size(0))
+    def seed_everything(seed):
+        import random
+        import os
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.random.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = True
 
-    (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
-     test_final_index, _) = common.preprocess_data(times, X, y, final_index,
-                                                   append_times=True,
-                                                   append_intensity=False)
+    # Set the random seed
+    seed_everything(config['seed'])
 
-    common.save_data(processed_data_loc,
-                     times=times,
-                     train_coeffs=train_coeffs, val_coeffs=val_coeffs, test_coeffs=test_coeffs,
-                     train_y=train_y, val_y=val_y, test_y=test_y, train_final_index=train_final_index,
-                     val_final_index=val_final_index, test_final_index=test_final_index)
+    # Get dataloaders
+    train_loader, test_loader = get_dataloaders(
+        batch_size=config['batch_size'],
+        train_ratio=config['train_ratio'],
+        seed=config['seed']
+    )
 
-    tensors = common.load_data(processed_data_loc)
-    times = tensors['times']
-    train_coeffs = tensors['train_coeffs']
-    val_coeffs = tensors['val_coeffs']
-    test_coeffs = tensors['test_coeffs']
-    train_y = tensors['train_y']
-    val_y = tensors['val_y']
-    test_y = tensors['test_y']
-    train_final_index = tensors['train_final_index']
-    val_final_index = tensors['val_final_index']
-    test_final_index = tensors['test_final_index']
-
-    times, train_dataloader, val_dataloader, test_dataloader = common.wrap_data(times, train_coeffs, val_coeffs,
-                                                                                test_coeffs, train_y, val_y, test_y,
-                                                                                train_final_index, val_final_index,
-                                                                                test_final_index, 'cpu',
-                                                                                batch_size=batch_size)
-
-    return times, train_dataloader, val_dataloader, test_dataloader
+    return train_loader, test_loader, config['batch_size']
 
 
 def plot_sample_paths(file_path=None, num_samples_per_class=1):

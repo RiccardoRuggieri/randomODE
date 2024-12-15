@@ -143,7 +143,7 @@ def create_dataloaders(train_data, test_data, batch_size=16):
 def get_data():
     config = {
         'batch_size': 32,
-        'segment_length': 360,
+        'segment_length': 180,
         'sampling_rate': 360,
         'train_ratio': 0.8,
         'seed': 42,

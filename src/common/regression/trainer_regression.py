@@ -23,7 +23,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
             total_loss += loss.item()
 
-        if epoch % 50 == 0:
+        if epoch % 10 == 0:
             avg_loss = total_loss / len(train_loader)
             print(f'Epoch {epoch}, Loss: {avg_loss}')
 

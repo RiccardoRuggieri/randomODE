@@ -84,7 +84,7 @@ def run_all(intensity, device, model_names=['staticsde', 'naivesde', 'neurallsde
 if __name__ == "__main__":
     # Define parameters directly in the code
     intensity = False  # Set to True or False
-    device = 'cuda'  # Choose 'cuda' or 'cpu'
+    device = 'cpu'  # Choose 'cuda' or 'cpu'
     model_names = ['neurallnsde']  # List of models to run
     num_runs = 1  # Number of repetitions
 

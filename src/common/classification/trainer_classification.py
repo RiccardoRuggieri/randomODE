@@ -8,7 +8,7 @@ import sklearn.metrics
 import torch
 import tqdm
 
-from model.classification.my_neural_lsde import NeuralSDE, DiffusionModel
+from model.classification.neuralsde_classification import NeuralSDE, DiffusionModel
 
 here = pathlib.Path(__file__).resolve().parent
 
@@ -76,7 +76,6 @@ def _evaluate_metrics(dataloader, model, times, loss_fn, num_classes, device, kw
             total_confusion += sklearn.metrics.confusion_matrix(true_y_cpu, thresholded_y_cpu,
                                                                 labels=range(num_classes))
             total_dataset_size += batch_size
-            print(pred_y.shape, true_y.shape)
             total_loss += loss_fn(pred_y, true_y) * batch_size
 
         total_loss /= total_dataset_size  # assume 'mean' reduction in the loss function
@@ -327,7 +326,7 @@ def make_model(name, input_channels, output_channels, hidden_channels, hidden_hi
         def make_model():
             vector_field = DiffusionModel(input_channels=input_channels, hidden_channels=hidden_channels,
                                                   hidden_hidden_channels=hidden_hidden_channels, num_hidden_layers=num_hidden_layers,
-                                                  input_option=4, noise_option=17) 
+                                                  input_option=4, noise_option=17)
             model = NeuralSDE(func=vector_field, input_channels=input_channels,
                                      hidden_channels=hidden_channels, output_channels=output_channels, initial=initial)
             return model, vector_field

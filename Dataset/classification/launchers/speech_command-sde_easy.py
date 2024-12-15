@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-from Dataset.classification.utils import MIT_BIH_easy
+from Dataset.classification.utils import speech_command_easy
 import model.classification.ode_flow as ode_flow
 import model.classification.ode_flow_noisy as ode_flow_noisy
 import model.classification.sde as sde
@@ -9,8 +9,8 @@ from common.classification.trainer_classification_easy import _train_loop
 
 def main_classical_training():
 
-    input_dim = 2
-    num_classes = 8
+    input_dim = 20
+    num_classes = 10
     hidden_dim = 16
     num_layers = 1
 
@@ -18,10 +18,10 @@ def main_classical_training():
     device = torch.device("cuda" if use_cuda else "cpu")
 
     model0 = sde.Generator(input_dim=input_dim,
-                            hidden_dim=hidden_dim,
-                            num_classes=num_classes,
-                            num_layers=num_layers,
-                            vector_field=sde.GeneratorFunc).to(device)
+                           hidden_dim=hidden_dim,
+                           num_classes=num_classes,
+                           num_layers=num_layers,
+                           vector_field=sde.GeneratorFunc).to(device)
 
     model1 = ode_flow.Generator(input_dim=input_dim,
                                 hidden_dim=hidden_dim,
@@ -30,10 +30,10 @@ def main_classical_training():
                                 vector_field=ode_flow.GeneratorFunc).to(device)
 
     model2 = ode_flow_noisy.Generator(input_dim=input_dim,
-                                                    hidden_dim=hidden_dim,
-                                                    num_classes=num_classes,
-                                                    num_layers=num_layers,
-                                                    vector_field=ode_flow_noisy.GeneratorFunc).to(device)
+                                      hidden_dim=hidden_dim,
+                                      num_classes=num_classes,
+                                      num_layers=num_layers,
+                                      vector_field=ode_flow_noisy.GeneratorFunc).to(device)
 
 
     num_epochs = 50
@@ -43,7 +43,8 @@ def main_classical_training():
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
-    train_loader, test_loader, _ = MIT_BIH_easy.get_data()
+    data_manager = speech_command_easy.SpeechCommandsData(train_ratio=0.8, batch_size=64, seed=42)
+    train_loader, test_loader = data_manager.get_data()
 
     # Here we train the model
     all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)

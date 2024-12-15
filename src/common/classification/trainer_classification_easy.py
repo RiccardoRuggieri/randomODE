@@ -1,13 +1,14 @@
+import time
 import torch
 
 def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
     for epoch in range(1, num_epochs + 1):
+        start_time = time.time()
         model.train()
         total_loss = 0
         for batch in train_loader:
             coeffs, labels = batch[1].to(device), batch[2].to(device)
             times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
-
             optimizer.zero_grad()
 
             # Forward pass
@@ -20,9 +21,11 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
             total_loss += loss.item()
 
+        epoch_time = time.time() - start_time
         if epoch % 1 == 0:
+            # epoch time for computation
             avg_loss = total_loss / len(train_loader)
-            print(f'Epoch {epoch}, Train Loss: {avg_loss}')
+            print(f'Epoch {epoch}, Train Loss: {avg_loss}, Time: {epoch_time:.2f} seconds')
 
             # Evaluation on test set
             model.eval()
@@ -56,7 +59,6 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             # Plot sample predictions
             num_samples = 5
             print("Sample Random Predictions:")
-            # todo: fix a random number between 0 and len(all_preds) - 1
             for i  in range(num_samples):
                 print(f"True: {all_trues[i].item()}, Pred: {all_preds[i].item()}")
 
