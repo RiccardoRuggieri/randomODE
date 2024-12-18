@@ -11,7 +11,7 @@ def main_classical_training():
 
     input_dim = 20
     num_classes = 10
-    hidden_dim = 16
+    hidden_dim = 32
     num_layers = 1
 
     use_cuda = torch.cuda.is_available()
@@ -43,7 +43,7 @@ def main_classical_training():
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
-    data_manager = speech_command_easy.SpeechCommandsData(train_ratio=0.8, batch_size=64, seed=42)
+    data_manager = speech_command_easy.SpeechCommandsData(train_ratio=0.8, batch_size=128, seed=42)
     train_loader, test_loader = data_manager.get_data()
 
     # Here we train the model

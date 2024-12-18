@@ -39,14 +39,14 @@ def main_classical_training():
     num_epochs = 50
     lr = 1e-3
 
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optim.Adam(model2.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
     train_loader, test_loader, _ = OU_process.get_data()
 
     # Here we train the model
-    all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    all_preds, all_trues = _train_loop(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # train_flow_matching(model4, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 

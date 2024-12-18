@@ -64,7 +64,10 @@ class MITBIHDataset(Dataset):
             'E': 7,
         }
         self.times = torch.linspace(0, 1, segment_length)  # Uniformly spaced time values
-        self.data = self._process_data()
+        if not processed_data_loc.exists():
+            self.data = self._process_data()
+        else:
+            self.data = torch.load(processed_data_loc / "processed_data.pt")
         if not self.data:
             raise ValueError("No data processed. Verify dataset path and processing logic.")
 
@@ -164,6 +167,7 @@ def get_data():
     seed_everything(config['seed'])
 
     download_data()
+
     dataset = MITBIHDataset(data_dir=dataset_loc,
                             segment_length=config['segment_length'],
                             sampling_rate=config['sampling_rate'])
