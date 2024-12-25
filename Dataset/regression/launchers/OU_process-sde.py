@@ -1,8 +1,10 @@
 import model.regression.neuralsde_regression as neuralsde_regression
 import model.regression.ode_flow as ode_flow
+import model.regression.ode_flow_noisy as ode_flow_noisy
 import torch
 import torch.optim as optim
 from common.regression.trainer_regression import _train_loop
+from common.regression.trainer_regression_forecasting import _train_loop as train
 import Dataset.regression.utils.OU_process as OU_process
 
 
@@ -33,6 +35,12 @@ def main_classical_training():
                                             num_layers=num_layers,
                                             vector_field=ode_flow.GeneratorFunc).to(device)
 
+    model3 = ode_flow_noisy.Generator(input_dim=input_dim,
+                                            hidden_dim=hidden_dim,
+                                            output_dim=output_dim,
+                                            num_layers=num_layers,
+                                            vector_field=ode_flow_noisy.GeneratorFunc).to(device)
+
 
 
 
@@ -46,7 +54,10 @@ def main_classical_training():
     train_loader, test_loader, _ = OU_process.get_data()
 
     # Here we train the model
-    all_preds, all_trues = _train_loop(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    # regression
+    #all_preds, all_trues = _train_loop(model3, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    # forecasting
+    train(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # train_flow_matching(model4, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 

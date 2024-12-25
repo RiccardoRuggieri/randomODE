@@ -39,14 +39,14 @@ def main_classical_training():
     num_epochs = 50
     lr = 1e-3
 
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optim.Adam(model2.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
     train_loader, test_loader, _ = MIT_BIH_easy.get_data()
 
     # Here we train the model
-    all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    all_preds, all_trues = _train_loop(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # Show some stats at the end of the training
     # show_distribution_comparison(all_preds, all_trues)

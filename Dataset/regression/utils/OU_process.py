@@ -104,10 +104,10 @@ def get_data():
     config = {
         'num_samples': 1000,
         'T': 10.0,
-        'N': 20,
+        'N': 50,
         'theta': 0.2,
         'mu': 0.0,
-        'sigma': 0.7,
+        'sigma': 2.0,
         'X0': 1.0,
         'train_ratio': 0.8,
         'batch_size': 16,

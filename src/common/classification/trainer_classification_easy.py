@@ -1,6 +1,7 @@
 import time
 import torch
 
+
 def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
     for epoch in range(1, num_epochs + 1):
         start_time = time.time()
@@ -15,7 +16,6 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             logits = model(coeffs, times)  # Include the 'times' argument
             loss = criterion(logits, labels)
 
-            # Backward pass
             loss.backward()
             optimizer.step()
 

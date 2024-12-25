@@ -3,9 +3,11 @@ import torch.nn as nn
 import torchcde
 from torchdiffeq import odeint
 
+
 class LipSwish(nn.Module):
     def forward(self, x):
         return 0.909 * torch.nn.functional.silu(x)
+
 
 class MLP(nn.Module):
     def __init__(self, in_size, out_size, hidden_dim, num_layers, tanh=False, activation='lipswish'):
@@ -28,17 +30,18 @@ class MLP(nn.Module):
     def forward(self, x):
         return self._model(x)
 
-# Generator function
+
+# Generator function with energy landscape feedback
 class GeneratorFunc(nn.Module):
-    def __init__(self, input_dim, hidden_dim, hidden_hidden_dim, num_layers, activation='lipswish'):
+    def __init__(self, input_dim, hidden_dim, hidden_hidden_dim, num_layers, activation='lipswish', gamma=1):
         super(GeneratorFunc, self).__init__()
 
         self.linear_in = nn.Linear(hidden_dim + 1, hidden_dim)
         self.linear_X = nn.Linear(input_dim, hidden_dim)
         self.emb = nn.Linear(hidden_dim * 2, hidden_dim)
         self.f_net = MLP(hidden_dim, hidden_dim, hidden_hidden_dim, num_layers, activation=activation)
-        #self.f_net = nn.Linear(hidden_dim, hidden_dim)
         self.linear_out = nn.Linear(hidden_dim, hidden_dim)
+        self.gamma = gamma  # Feedback strength parameter
 
     def set_X(self, coeffs, times):
         self.coeffs = coeffs
@@ -46,28 +49,45 @@ class GeneratorFunc(nn.Module):
         self.X = torchcde.CubicSpline(self.coeffs, self.times)
 
     def forward(self, t, y):
+        # Evaluate X(t) from the control
         Xt = self.X.evaluate(t)
-        Xt = self.linear_X(Xt)
+        Xt_transformed = self.linear_X(Xt)
+
         if t.dim() == 0:
             t = torch.full_like(y[:, 0], fill_value=t).unsqueeze(-1)
         yy = self.linear_in(torch.cat((t, y), dim=-1))
-        z = self.emb(torch.cat([yy, Xt], dim=-1))
-        z = self.f_net(z)
-        return self.linear_out(z)
 
-# Generator
+        # Energy-based feedback term (gradient of |y - Xt|^2 / 2)
+        feedback = self.gamma * (y - Xt_transformed)
+
+        z = self.emb(torch.cat([yy, Xt_transformed], dim=-1))
+        z = self.f_net(z)
+
+        # Include feedback in the vector field
+        return self.linear_out(z) * feedback
+
+
+# Generator with the updated GeneratorFunc
 class Generator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, activation='lipswish', vector_field=None):
+    def __init__(self, input_dim, hidden_dim, num_classes, num_layers, activation='lipswish', vector_field=None):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
         self.initial = nn.Linear(input_dim, hidden_dim)
-        self.decoder = nn.Linear(hidden_dim, output_dim)
+        self.classifier = torch.nn.Linear(hidden_dim, num_classes)
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)
         y0 = self.func.X.evaluate(times)
-        y0 = self.initial(y0)[:, 0, :]
+        y0 = self.initial(y0)[:, 0, :]  # Initial hidden state
 
-        z = odeint(self.func, y0, times, method='rk4', options={"step_size": 0.05})
-        z = z.permute(1, 0, 2)
-        return self.decoder(z)
+        z = odeint(self.func, y0, times, method='euler', options={"step_size": 0.05})
+
+        final_index = torch.tensor([len(times) - 1], device=z.device)
+        final_index_indices = final_index.unsqueeze(-1).expand(z.shape[1:]).unsqueeze(0)
+        z = z.gather(dim=0, index=final_index_indices).squeeze(0)
+
+        # Linear map and return
+        pred_y = self.classifier(z)
+        return pred_y
+
+
