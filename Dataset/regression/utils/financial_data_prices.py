@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 import torch
 import torchcde
@@ -21,6 +22,22 @@ def fetch_stock_data(ticker, start_date, end_date):
     """
     stock_data = yf.download(ticker, start=start_date, end=end_date)
     return stock_data['Close'].dropna().values
+
+def calculate_volatility(prices, window=20):
+    """
+    Calculate rolling volatility from historical prices.
+
+    Parameters:
+    prices (np.ndarray): Historical prices (1D array).
+    window (int): Rolling window size for volatility estimation.
+
+    Returns:
+    np.ndarray: Rolling volatility values with shape (N, 1).
+    """
+    log_returns = np.log(prices[1:] / prices[:-1])  # Compute log returns
+    log_returns = log_returns.squeeze()  # Ensure log_returns is 1D
+    volatility = np.sqrt(window) * pd.Series(log_returns).rolling(window=window).std().dropna()
+    return volatility.values.reshape(-1, 1)  # Reshape to (N, 1)
 
 
 def calibrate_gbm_parameters(prices, dt):
@@ -123,16 +140,15 @@ def create_data_loaders(train_data, train_coeffs, test_data, test_coeffs, batch_
 def get_gbm_data():
     # Parameters
     config = {
-        'ticker': 'AAPL',
-        'start_date_train': '2022-06-01',
+        'ticker': 'NVDA',
+        'start_date_train': '2022-12-15',
         'end_date_train': '2022-12-31',
         # Here you can introduce a gap between training and forecasting data
         # Keep in mind that these two data should have same dimension
-        'start_date_forecast': '2022-07-06',
-        'end_date_forecast': '2023-02-06',
+        'start_date_forecast': '2022-12-15',
+        'end_date_forecast': '2022-12-31',
         'num_samples': 1000,
         'T': 1.0,
-        'N': 148,
         'train_ratio': 0.8,
         'batch_size': 16,
         'seed': 32,
@@ -155,24 +171,27 @@ def get_gbm_data():
     # Fetch stock data and calibrate GBM parameters
     prices_train = fetch_stock_data(config['ticker'], config['start_date_train'], config['end_date_train'])
     prices_forecast = fetch_stock_data(config['ticker'], config['start_date_forecast'], config['end_date_forecast'])
+    # _prices_forecast = fetch_stock_data('NVDA', config['start_date_forecast'], config['end_date_forecast'])
 
-    print(prices_train.shape, prices_forecast.shape)
+    # print(prices_train.shape, prices_forecast.shape)
+
+    N = len(prices_train)
 
     # Here we pass only training data
-    S0 = prices_train[-1]
-    mu, sigma = calibrate_gbm_parameters(prices_train, 1/config['N'])
+    S0_train = prices_train[0]
+    S0_forecast = prices_forecast[0]
+    mu, sigma = calibrate_gbm_parameters(prices_train, 1/N)
 
     # Simulate a GBM path
     T = 1.0
-    N = len(prices_train)
-    t_gbm, S_gbm = gbm_process(T, N, mu, sigma, S0)
+    t_gbm, S_gbm = gbm_process(T, N, mu, sigma, S0_train)
 
     # Plot fetched prices and GBM
-    plot_price_and_gbm(prices_train, t_gbm, S_gbm)
+    # plot_price_and_gbm(prices_train, t_gbm, S_gbm)
 
-    # Generate GBM sample paths (passing forecasting data) --> + 1 month and 6 days
+    # Generate GBM sample paths (passing forecasting data) --> + 1 month
     total_data, total_targets, coeffs_data, coeffs_targets, times = (
-        generate_gbm_data(config['num_samples'], config['T'], config['N'], mu, sigma, S0, prices_forecast.squeeze(-1)))
+        generate_gbm_data(config['num_samples'], config['T'], N, mu, sigma, S0_forecast, prices_forecast.squeeze(-1)))
 
     # Split data
     train_data, train_coeffs, test_data, test_coeffs = split_data(total_data, total_targets, coeffs_data, coeffs_targets, config['train_ratio'])

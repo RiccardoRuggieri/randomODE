@@ -30,6 +30,17 @@ def ou_process(T, N, theta, mu, sigma, X0):
         dW = np.random.normal(0, np.sqrt(dt))
         X[i] = X[i-1] + theta * (mu - X[i-1]) * dt + sigma * dW
 
+    # sinusoidal function
+    # t = np.linspace(0, T, N)
+    # X = np.zeros(N)
+    # X[0] = X0
+    # for i in range(1, N):
+    #     # simple sinusoidal function
+    #     X[i] = 0.05 * ( X[i-1] + np.sin(t[i] * 2) + np.random.normal(0, 0.1))
+    #
+    # # normalize
+    # X = (X - X.mean()) / X.std() + 0.5
+
     return t, X
 
 def generate_data(num_samples, T, N, theta, mu, sigma, X0):
@@ -42,8 +53,7 @@ def generate_data(num_samples, T, N, theta, mu, sigma, X0):
     total_data = total_data.permute(0, 2, 1)  # [Batch size, Length, Dimension]
 
     # normalize the data
-    total_data = (total_data - total_data.mean()) / total_data.std()
-    print(total_data.shape)
+    total_data = (total_data - total_data.mean()) / total_data.std() + 1
 
     max_len = total_data.shape[1]
     times = torch.linspace(0, 1, max_len)
@@ -103,13 +113,13 @@ def get_data():
 
     # Parameters
     config = {
-        'num_samples': 1000,
+        'num_samples': 5000,
         'T': 10.0,
-        'N': 100,
-        'theta': 0.2,
-        'mu': 0.0,
-        'sigma': 2.0,
-        'X0': 1.0,
+        'N': 10,
+        'theta': 0.5,
+        'mu': 0.7,
+        'sigma': 0.5,
+        'X0': 1.5,
         'train_ratio': 0.8,
         'batch_size': 16,
         'seed': 42,

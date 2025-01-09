@@ -69,9 +69,10 @@ class Generator(torch.nn.Module):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
         self.initial = nn.Linear(input_dim, hidden_dim)
-        self.classifier = torch.nn.Sequential(torch.nn.Linear(hidden_dim, hidden_dim),
-                                              torch.nn.BatchNorm1d(hidden_dim), torch.nn.ReLU(), torch.nn.Dropout(0.1),
-                                              torch.nn.Linear(hidden_dim, num_classes))
+        # self.classifier = torch.nn.Sequential(torch.nn.Linear(hidden_dim, hidden_dim),
+        #                                       torch.nn.BatchNorm1d(hidden_dim), torch.nn.ReLU(), torch.nn.Dropout(0.1),
+        #                                       torch.nn.Linear(hidden_dim, num_classes))
+        self.classifier = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)
@@ -81,7 +82,7 @@ class Generator(torch.nn.Module):
         z_t = torchsde.sdeint(sde=self.func,
                               y0=y0,
                               ts=times,
-                              dt=1e-3,
+                              dt=0.05,
                               method='euler')
 
         final_index = torch.tensor([len(times) - 1], device=z_t.device)

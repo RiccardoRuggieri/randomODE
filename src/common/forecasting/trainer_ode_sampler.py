@@ -1,8 +1,8 @@
+import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import numpy as np
 
-def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon=0.15):
+def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon):
     global all_preds, all_trues
     for epoch in range(1, num_epochs + 1):
         model.train()
@@ -11,23 +11,21 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             coeffs = batch[1].to(device)
             times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
 
-            _len = int(batch[0].shape[1] * (1 - forecast_horizon))
+            # forecast horizon
+            _len = int(batch[0].shape[1] - forecast_horizon)
 
-            # masking the first dimension of coeffs from _len to the end
             coeffs = torch.cat((coeffs[:, :_len], torch.zeros_like(coeffs[:, _len:])), dim=1)
 
             optimizer.zero_grad()
             true = batch[0][:, :, 1].to(device)
-            #_true = true[:, :_len]
             pred = model(coeffs, times).squeeze(-1)
-            # print(pred.shape, true.shape)
-            loss = criterion(pred[:, _len:], true[:, _len:])
+            loss = criterion(pred, true[:, _len:])
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
 
-        if epoch % 10 == 0:
+        if epoch % 3 == 0:
             avg_loss = total_loss / len(train_loader)
             print(f'Epoch {epoch}, Loss: {avg_loss}')
 
@@ -41,20 +39,18 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
                     coeffs = batch[1].to(device)
                     times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
                     coeffs = torch.cat((coeffs[:, :_len], torch.zeros_like(coeffs[:, _len:])), dim=1)
-                    # coeffs[:, _len:] = 0
 
                     true = batch[0][:, :, 1].to(device)
-                    #pred = model.sampler(coeffs, times, _len)
                     pred = model(coeffs, times).squeeze(-1)
                     # only compute the (pre-)forecasting loss
-                    loss = criterion(pred[:, _len:], true[:, _len:])
+                    loss = criterion(pred, true[:, _len:])
                     total_loss += loss.item()
 
                     # all_preds.append(pred[:, _len:].cpu())
                     # all_trues.append(true[:, _len:].cpu())
 
                     # fill 1 - _len of pred with 0 to have a matched shape with true
-                    # pred = torch.cat((torch.zeros_like(true[:, :_len]), pred), dim=1)
+                    pred = torch.cat((torch.zeros_like(true[:, :_len]), pred), dim=1)
 
                     all_preds.append(pred.cpu())
                     all_trues.append(true.cpu())

@@ -67,7 +67,11 @@ class Generator(nn.Module):
         y0 = self.func.X.evaluate(times)
         y0 = self.initial(y0)[:, 0, :]
 
-        z = odeint(self.func, y0, times, method='rk4', options={"step_size": 0.05})
+        z = odeint(self.func,
+                   y0,
+                   times,
+                   method='euler',
+                   options={"step_size": 0.01})
 
         z = z.permute(1, 0, 2)
         return self.decoder(z)
