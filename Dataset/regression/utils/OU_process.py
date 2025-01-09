@@ -43,6 +43,7 @@ def generate_data(num_samples, T, N, theta, mu, sigma, X0):
 
     # normalize the data
     total_data = (total_data - total_data.mean()) / total_data.std()
+    print(total_data.shape)
 
     max_len = total_data.shape[1]
     times = torch.linspace(0, 1, max_len)
@@ -104,7 +105,7 @@ def get_data():
     config = {
         'num_samples': 1000,
         'T': 10.0,
-        'N': 50,
+        'N': 100,
         'theta': 0.2,
         'mu': 0.0,
         'sigma': 2.0,

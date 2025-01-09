@@ -37,7 +37,6 @@ class GeneratorFunc(nn.Module):
         self.linear_X = nn.Linear(input_dim, hidden_dim)
         self.emb = nn.Linear(hidden_dim * 2, hidden_dim)
         self.f_net = MLP(hidden_dim, hidden_dim, hidden_hidden_dim, num_layers, activation=activation)
-        #self.f_net = nn.Linear(hidden_dim, hidden_dim)
         self.linear_out = nn.Linear(hidden_dim, hidden_dim)
 
     def set_X(self, coeffs, times):
@@ -57,7 +56,7 @@ class GeneratorFunc(nn.Module):
 
 # Generator
 class Generator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, activation='lipswish', vector_field=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, activation=None, vector_field=None):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
         self.initial = nn.Linear(input_dim, hidden_dim)
@@ -69,5 +68,9 @@ class Generator(nn.Module):
         y0 = self.initial(y0)[:, 0, :]
 
         z = odeint(self.func, y0, times, method='rk4', options={"step_size": 0.05})
+
         z = z.permute(1, 0, 2)
         return self.decoder(z)
+
+
+

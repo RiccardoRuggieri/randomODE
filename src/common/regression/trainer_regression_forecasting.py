@@ -1,7 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
 
-
 def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion):
     global all_preds, all_trues
     for epoch in range(1, num_epochs + 1):
@@ -11,7 +10,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             coeffs = batch[1].to(device)
             times = torch.linspace(0, 1, batch[0].shape[1]).to(device)
 
-            _len = int(batch[0].shape[1] * 0.5)
+            _len = int(batch[0].shape[1] * 0.6)
             _coeffs = coeffs[:_len]
             _times = times[:_len]
 
@@ -56,15 +55,15 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_trues = torch.cat(all_trues, dim=0)
 
             ## plotting
-            num_samples = 1
+            num_samples = 5
 
-            plt.figure(figsize=(8, 4))
+            plt.figure(figsize=(12, 6))
             for i in range(num_samples):
                 plt.plot(all_trues[i].numpy(), color='r')
                 plt.plot(all_preds[i].numpy(), color='b')
             plt.xlabel('Time')
             plt.ylabel('Value')
-            plt.ylim(-2,2)
+            plt.ylim(0, 1.5)
             plt.title('Model Predictions vs True Values')
             plt.show()
 

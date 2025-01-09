@@ -3,8 +3,6 @@ import model.regression.ode_flow as ode_flow
 import torch
 import torch.optim as optim
 from common.regression.trainer_regression import _train_loop
-from common.regression.trainer_regression_forecasting import _train_loop as train
-import Dataset.regression.utils.OU_process as OU_process
 import Dataset.regression.utils.financial_data as financial_data
 
 
@@ -30,30 +28,27 @@ def main_classical_training():
 
 
     model2 = ode_flow.Generator(input_dim=input_dim,
-                                            hidden_dim=hidden_dim,
-                                            output_dim=output_dim,
-                                            num_layers=num_layers,
-                                            vector_field=ode_flow.GeneratorFunc).to(device)
+                                hidden_dim=hidden_dim,
+                                output_dim=output_dim,
+                                num_layers=num_layers,
+                                vector_field=ode_flow.GeneratorFunc).to(device)
 
 
-    num_epochs = 50
+    num_epochs = 100
     lr = 1e-3
 
-    optimizer = optim.Adam(model2.parameters(), lr=lr)
+    optimizer = optim.Adam(model1.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
-    train_loader, test_loader, _ = OU_process.get_data()
+    #train_loader, test_loader, _ = OU_process.get_data()
+    train_loader, test_loader, _ = financial_data.get_gbm_data()
 
     # Here we train the model
     # regression
-    all_preds, all_trues = _train_loop(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
     # forecasting
     # train(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
-    # Show some stats at the end of the training
-    # show_distribution_comparison(all_preds, all_trues)
-
 if __name__ == '__main__':
     main_classical_training()
-

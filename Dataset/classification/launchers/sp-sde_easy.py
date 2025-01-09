@@ -2,10 +2,8 @@ import torch
 import torch.optim as optim
 from Dataset.classification.utils import diffusion_data_easy
 import model.classification.ode_flow as ode_flow
-import model.classification.ode_flow_noisy as ode_flow_noisy
 import model.classification.sde as sde
 from common.classification.trainer_classification_easy import _train_loop
-
 
 def main_classical_training():
 
@@ -28,13 +26,6 @@ def main_classical_training():
                                 num_classes=num_classes,
                                 num_layers=num_layers,
                                 vector_field=ode_flow.GeneratorFunc).to(device)
-
-    model2 = ode_flow_noisy.Generator(input_dim=input_dim,
-                                      hidden_dim=hidden_dim,
-                                      num_classes=num_classes,
-                                      num_layers=num_layers,
-                                      vector_field=ode_flow_noisy.GeneratorFunc).to(device)
-
 
     num_epochs = 1000
     lr = 1e-3
