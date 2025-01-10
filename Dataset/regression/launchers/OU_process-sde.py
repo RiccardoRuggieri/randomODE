@@ -5,7 +5,6 @@ import torch.optim as optim
 from common.regression.trainer_regression import _train_loop
 from common.regression.trainer_regression_forecasting import _train_loop as train
 import Dataset.regression.utils.OU_process as OU_process
-import Dataset.regression.utils.financial_data_volatility as financial_data
 
 
 def main_classical_training():

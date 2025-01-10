@@ -7,6 +7,7 @@ import torch.optim as optim
 from common.regression.trainer_regression_forecasting import _train_loop as train
 import Dataset.regression.utils.financial_data_prices as financial_data
 import Dataset.regression.utils.OU_process as OU_process
+import Dataset.regression.utils.single_ts_prediction_stocks as single_ts_prediction
 
 
 def main_classical_training():
@@ -56,11 +57,11 @@ def main_classical_training():
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
-    train_loader, test_loader, _ = OU_process.get_data()
-    # train_loader, test_loader, _ = financial_data.get_gbm_data()
+    # train_loader, test_loader, _ = OU_process.get_data()
+    train_loader, test_loader, _ = financial_data.get_gbm_data()
 
     # Here we train the model for forecasting
-    train(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon=0.2)
+    train(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon=0.1)
 
 if __name__ == '__main__':
     main_classical_training()
