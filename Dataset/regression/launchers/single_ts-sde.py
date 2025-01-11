@@ -11,8 +11,8 @@ def main_classical_training():
     Generate the OU process data and train the model for a regression task using a neural sde langevin model.
     :return:
     """
-    input_dim = 1 + 1 - 1
-    hidden_dim = 32
+    input_dim = 12 + 1 - 1
+    hidden_dim = 64
     forecast_horizon = 1
     num_layers = 1
 
@@ -34,14 +34,14 @@ def main_classical_training():
     num_epochs = 200
     lr = 1e-3
 
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optim.Adam(model2.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
-    train_loader, test_loader = single_ts_prediction.get_data()
+    train_loader, test_loader = single_ts_prediction.get_data(num_samples=forecast_horizon)
 
     # Here we train the model for forecasting
-    train(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    train(model2, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon=forecast_horizon)
 
 if __name__ == '__main__':
     main_classical_training()
