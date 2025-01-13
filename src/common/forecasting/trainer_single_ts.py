@@ -39,6 +39,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
                     true = batch[1].to(device).squeeze(-1).squeeze(-1)
                     pred = model(coeffs, times).squeeze(-1)
+                    # batch[0][:, -1, 1]
                     loss = criterion(pred, true[:, :, 1].squeeze(-1))
                     # loss = criterion(pred, true)
                     total_loss += loss.item()

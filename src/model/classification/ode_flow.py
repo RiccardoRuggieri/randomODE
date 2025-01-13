@@ -76,13 +76,14 @@ class Generator(nn.Module):
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers)
         self.initial = nn.Linear(input_dim, hidden_dim)
         self.classifier = nn.Linear(hidden_dim, num_classes)
+        # self.classifier = MLP(hidden_dim, num_classes, hidden_dim, num_layers)
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)
         y0 = self.func.X.evaluate(times)
         y0 = self.initial(y0)[:, 0, :]  # Initial hidden state
 
-        z = odeint(self.func, y0, times, method='euler', options={'step_size': 0.05})
+        z = odeint(self.func, y0, times, method='euler', options={'step_size': 0.02})
 
         # final_index is a tensor of shape (...)
         # z_t is a tensor of shape (times, ..., dim)
@@ -90,6 +91,5 @@ class Generator(nn.Module):
         final_index_indices = final_index.unsqueeze(-1).expand(z.shape[1:]).unsqueeze(0)
         z = z.gather(dim=0, index=final_index_indices).squeeze(0)
 
-        # Linear map and return
-        pred_y = self.classifier(z)
-        return pred_y
+        z = self.classifier(z)
+        return z

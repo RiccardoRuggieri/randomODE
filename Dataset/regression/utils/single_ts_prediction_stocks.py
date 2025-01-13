@@ -51,9 +51,9 @@ def super_fetch(ticker, start_date, end_date):
     data['High_Low_Spread'] = (data['High'] - data['Low']) / data['Low']
 
     # Step 2: Add rolling features
-    data['SMA_50'] = data['Close'].rolling(window=50).mean()
+    data['SMA_50'] = data['Close'].rolling(window=1).mean()
     data['EMA_20'] = data['Close'].ewm(span=20, adjust=False).mean()
-    data['Volatility_5d'] = data['Daily_Return'].rolling(window=5).std()
+    data['Volatility_5d'] = data['Daily_Return'].rolling(window=21).std()
 
     # Step 3: Compute RSI
     delta = data['Close'].diff()
@@ -80,9 +80,7 @@ def super_fetch(ticker, start_date, end_date):
     # Step 7: Drop NA values from rolling computations
     data.dropna(inplace=True)
 
-    return data[['Daily_Return', 'Volatility_5d', 'Close', 'High_Low_Spread', 'SMA_50', 'EMA_20',
-                 'RSI', 'MACD', 'Signal_Line', 'Bollinger_Upper',
-                 'Bollinger_Lower', 'Volume_ZScore']]
+    return data[['Volatility_5d', 'Close', 'Volume']].values
 
 def fetch_bivariate_series(ticker, start_date, end_date):
     """
@@ -171,6 +169,9 @@ def preprocess_windows(windows, predict_ahead=1):
     inputs = torch.Tensor(inputs)  # Shape: [Batch size, 20, 1]
     targets = torch.Tensor(targets)  # Shape: [Batch size, 1, 1]
 
+    # append times
+    inputs = torch.cat((inputs, torch.linspace(0, 1, inputs.shape[1]).unsqueeze(0).repeat(inputs.shape[0], 1).unsqueeze(-1)), dim=-1)
+
     # Create time steps for cubic spline interpolation
     times = torch.linspace(0, 1, inputs.shape[1])
     coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(inputs, times)
@@ -210,7 +211,7 @@ def get_data(num_samples=1):
         'ticker': 'IBM',
         'start_date': '2013-01-01',
         'end_date': '2023-01-01',
-        'window_size': 21,
+        'window_size': 50,
         'train_ratio': 0.8,
         'batch_size': 64,
         'seed': 42,
@@ -252,7 +253,6 @@ def get_data(num_samples=1):
 
     return train_loader, test_loader
 
-if __name__ == "__main__":
-    train_loader, test_loader = get_data()
-    print(f"Train data: {len(train_loader.dataset)} samples")
+
+
 
