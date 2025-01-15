@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 
 def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon):
     global all_preds, all_trues
+
+    results = {
+        "avg_L2_error": None,
+    }
+
     for epoch in range(1, num_epochs + 1):
         model.train()
         total_loss = 0
@@ -59,7 +64,9 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_preds = torch.cat(all_preds, dim=0)
             all_trues = torch.cat(all_trues, dim=0)
 
-            plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
+            # plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
+
+    results["avg_L2_error"] = avg_loss
 
     return all_preds, all_trues
 

@@ -71,12 +71,18 @@ class GeneratorFunc(nn.Module):
 
 # Generator
 class Generator(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_classes, num_layers, vector_field=None):
+    def __init__(self, input_dim, hidden_dim, num_classes, num_layers, vector_field=None, final_nonlinearity=False):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers)
         self.initial = nn.Linear(input_dim, hidden_dim)
-        self.classifier = nn.Linear(hidden_dim, num_classes)
-        # self.classifier = MLP(hidden_dim, num_classes, hidden_dim, num_layers)
+        if final_nonlinearity:
+            self.classifier = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, num_classes)
+            )
+        else:
+            self.classifier = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)

@@ -65,14 +65,14 @@ class GeneratorFunc(torch.nn.Module):
 
 # synthetic class for a 'Langevin' neural SDE
 class Generator(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_classes, num_layers, activation='lipswish', vector_field=None):
+    def __init__(self, input_dim, hidden_dim, forecast_horizon, num_layers, activation='lipswish', vector_field=None):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
         self.initial = nn.Linear(input_dim, hidden_dim)
-        # self.classifier = torch.nn.Sequential(torch.nn.Linear(hidden_dim, hidden_dim),
-        #                                       torch.nn.BatchNorm1d(hidden_dim), torch.nn.ReLU(), torch.nn.Dropout(0.1),
-        #                                       torch.nn.Linear(hidden_dim, num_classes))
-        self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.linear_in = nn.Linear(hidden_dim, forecast_horizon)
+        self.embedd_time = nn.Linear(2 * forecast_horizon, hidden_dim)
+        self.sample = nn.Linear(hidden_dim, forecast_horizon)
+        self.forecast_horizon = forecast_horizon
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)
@@ -85,10 +85,15 @@ class Generator(torch.nn.Module):
                               dt=0.02,
                               method='euler')
 
-        final_index = torch.tensor([len(times) - 1], device=z_t.device)
-        final_index_indices = final_index.unsqueeze(-1).expand(z_t.shape[1:]).unsqueeze(0)
-        z_t = z_t.gather(dim=0, index=final_index_indices).squeeze(0)
+        z = z_t[-1]
 
-        # Linear map and return
-        pred_y = self.classifier(z_t)
-        return pred_y
+        t = torch.linspace(0, 1, self.forecast_horizon).to(z.device)
+        t = t.unsqueeze(0).repeat(z.shape[0], 1)
+
+        z = self.linear_in(z)
+        z = z.relu()
+        z = self.embedd_time(torch.cat([z, t], dim=-1))
+        z = z.relu()
+        z = self.sample(z)
+
+        return z
