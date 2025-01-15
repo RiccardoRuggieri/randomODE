@@ -68,7 +68,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
     results["avg_L2_error"] = avg_loss
 
-    return all_preds, all_trues
+    return results
 
 def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
 
