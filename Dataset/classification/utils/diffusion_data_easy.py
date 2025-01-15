@@ -37,66 +37,80 @@ class StochasticProcessDataset(Dataset):
         return path, coeffs, label
 
 
-def generate_stochastic_process_dataset(output_file, num_path_to_generate=10002, timesteps=100, dt=0.1, seed=42):
+def generate_stochastic_process_dataset(output_file, num_path_to_generate=10000, timesteps=200, dt=0.1, seed=42):
     torch.manual_seed(seed)
     import numpy as np
     np.random.seed(seed)
 
-    def generate_ou_process(size, theta=0.5, mu=0.0, sigma=10):
-        x = torch.zeros(size)
+    def generate_ou_process1(size, theta=0.5, mu=0.0, sigma=2):
+        x = torch.ones(size)
         for t in range(1, size[1]):
             x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
         return x
 
-    def generate_gbm(size, mu=0.0, sigma=0.1):
+    def generate_ou_process2(size, theta=1, mu=0.0, sigma=5):
+        x = torch.ones(size)
+        for t in range(1, size[1]):
+            x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
+        return x
+
+    def generate_gbm(size, mu=0.0, sigma=4):
         x = torch.ones(size)
         for t in range(1, size[1]):
             x[:, t] = x[:, t - 1] * torch.exp((mu - 0.5 * sigma**2) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt)))
         return x
 
-    def generate_jump_diffusion(size, mu=0.0, sigma=5, jump_intensity=5, jump_mean=0.5, jump_std=2):
-        x = torch.zeros(size)
+    def generate_jump_diffusion1(size, mu=0.0, sigma=0.5, jump_intensity=2, jump_mean=0.1, jump_std=3):
+        x = torch.ones(size)
+        for t in range(1, size[1]):
+            jump = (torch.rand(size[0]) < jump_intensity * dt).float() * (jump_mean + jump_std * torch.randn(size[0]))
+            x[:, t] = x[:, t - 1] + mu * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt)) + jump
+        return x
+
+    def generate_jump_diffusion2(size, mu=0.0, sigma=2, jump_intensity=0.5, jump_mean=0.5, jump_std=1):
+        x = torch.ones(size)
         for t in range(1, size[1]):
             jump = (torch.rand(size[0]) < jump_intensity * dt).float() * (jump_mean + jump_std * torch.randn(size[0]))
             x[:, t] = x[:, t - 1] + mu * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt)) + jump
         return x
 
     def generate_logistic_process(size, r=0.5, K=1.0, sigma=0.1):
-        x = torch.rand(size) * 0.1  # Start close to 0
+        x = torch.ones(size)  # Start close to 0
         for t in range(1, size[1]):
             x[:, t] = x[:, t - 1] + r * x[:, t - 1] * (1 - x[:, t - 1] / K) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
             x[:, t] = torch.clamp(x[:, t], min=0, max=K)  # Ensure within bounds
         return x
 
-    def generate_brownian_bridge(size, sigma=0.1):
-        x = torch.zeros(size)
+    def generate_brownian_bridge(size, sigma=3):
+        x = torch.ones(size)
         for t in range(1, size[1]):
             drift = -x[:, t - 1] / (size[1] - t)  # Constrains the end point
             x[:, t] = x[:, t - 1] + drift * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
         return x
 
-    def generate_vasicek_process(size, theta=0.5, mu=0.0, sigma=0.1):
-        x = torch.zeros(size)
+    def generate_vasicek_process(size, theta=5, mu=0.0, sigma=5):
+        x = torch.ones(size)
         for t in range(1, size[1]):
             x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
         return x
 
 
-    def generate_cir_process(size, theta=0.5, mu=0.5, sigma=2):
-        x = torch.ones(size) * mu  # Start near the long-term mean
+    def generate_cir_process(size, theta=5.0, mu=1.0, sigma=5.0):
+        x = torch.ones(size)  # Start near the long-term mean
         for t in range(1, size[1]):
             sqrt_x = torch.sqrt(torch.clamp(x[:, t - 1], min=0))  # Ensure no negative values
             x[:, t] = x[:, t - 1] + theta * (mu - x[:, t - 1]) * dt + sigma * sqrt_x * torch.randn(size[0]) * torch.sqrt(torch.tensor(dt))
             x[:, t] = torch.clamp(x[:, t], min=0)  # Keep values non-negative
         return x
 
-    num_classes = 3
+    num_classes = 4
     num_paths_per_class = num_path_to_generate // num_classes
     data, list_coeffs, labels = [], [], []
 
-    process_generators = [generate_ou_process,
-                          generate_cir_process,
-                          generate_jump_diffusion]
+    process_generators = [generate_ou_process1,
+                          generate_ou_process2,
+                          generate_jump_diffusion1,
+                          generate_jump_diffusion2]
 
     for i, generator in enumerate(process_generators):
         paths = generator(size=(num_paths_per_class, timesteps))
@@ -200,7 +214,7 @@ def plot_sample_paths(file_path=None, num_samples_per_class=1):
     data, labels = dataset.data, dataset.labels
 
     # Define the classes
-    num_classes = 3
+    num_classes = 4
 
     # Create a plot
     plt.figure(figsize=(10, 6))

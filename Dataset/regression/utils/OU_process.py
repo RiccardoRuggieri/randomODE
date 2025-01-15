@@ -113,16 +113,16 @@ def get_data():
 
     # Parameters
     config = {
-        'num_samples': 5000,
+        'num_samples': 1000,
         'T': 10.0,
-        'N': 10,
+        'N': 40,
         'theta': 0.5,
-        'mu': 0.7,
-        'sigma': 0.5,
+        'mu': 0,
+        'sigma': 0.8,
         'X0': 1.5,
         'train_ratio': 0.8,
-        'batch_size': 16,
-        'seed': 42,
+        'batch_size': 32,
+        'seed': 12,
     }
 
     # Ensure reproducibility

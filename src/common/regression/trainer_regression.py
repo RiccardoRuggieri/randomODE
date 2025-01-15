@@ -57,7 +57,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
                 plt.plot(all_preds[i].numpy(), color='b')
             plt.xlabel('Time')
             plt.ylabel('Value')
-            plt.ylim(-0,1.5)
+            plt.ylim(-1,1)
             plt.title('Model Predictions vs True Values')
             plt.show()
 

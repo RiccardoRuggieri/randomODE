@@ -8,7 +8,7 @@ from common.classification.trainer_classification_easy import _train_loop
 def main_classical_training():
 
     input_dim = 1
-    num_classes = 3
+    num_classes = 4
     hidden_dim = 16
     num_layers = 1
 
@@ -27,17 +27,17 @@ def main_classical_training():
                                 num_layers=num_layers,
                                 vector_field=ode_flow.GeneratorFunc).to(device)
 
-    num_epochs = 1000
+    num_epochs = 200
     lr = 1e-3
 
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optim.Adam(model0.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
     train_loader, test_loader, _ = diffusion_data_easy.get_data()
 
     # Here we train the model
-    all_preds, all_trues = _train_loop(model1, optimizer, num_epochs, train_loader, test_loader, device, criterion)
+    all_preds, all_trues = _train_loop(model0, optimizer, num_epochs, train_loader, test_loader, device, criterion)
 
     # Show some stats at the end of the training
     # show_distribution_comparison(all_preds, all_trues)

@@ -214,7 +214,7 @@ def get_data(num_samples=1):
         'window_size': 50,
         'train_ratio': 0.8,
         'batch_size': 64,
-        'seed': 42,
+        'seed': 36,
         'num_samples': num_samples,
     }
 

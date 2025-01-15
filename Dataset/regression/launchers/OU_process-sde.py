@@ -14,7 +14,7 @@ def main_classical_training():
     """
     input_dim = 1 + 1
     output_dim = 1
-    hidden_dim = 32
+    hidden_dim = 16
     num_layers = 1
 
     use_cuda = torch.cuda.is_available()
@@ -35,7 +35,7 @@ def main_classical_training():
                                             vector_field=ode_flow.GeneratorFunc).to(device)
 
 
-    num_epochs = 50
+    num_epochs = 200
     lr = 1e-3
 
     optimizer = optim.Adam(model2.parameters(), lr=lr)
