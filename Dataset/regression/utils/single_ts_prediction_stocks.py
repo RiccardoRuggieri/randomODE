@@ -156,10 +156,18 @@ def preprocess_windows(windows, predict_ahead=1):
     inputs = windows[:, :-1 -predict_ahead + 1]  # First 20 days
     targets = windows[:, -1 -predict_ahead + 1:]  # 21st day
 
+    # save mean and std for later
+    mean = torch.zeros(targets.shape[2])
+    std = torch.zeros(targets.shape[2])
+
     print(inputs.shape)
     # Normalize inputs and targets separately
     for i in range(inputs.shape[2]):
         inputs[:, :, i] = (inputs[:, :, i] - inputs[:, :, i].mean()) / inputs[:, :, i].std()
+
+    for i in range(targets.shape[2]):
+        mean[i] = targets[:, :, i].mean()
+        std[i] = targets[:, :, i].std()
         targets[:, :, i] = (targets[:, :, i] - targets[:, :, i].mean()) / targets[:, :, i].std()
 
     # introduce noise to the inputs, just for fun
@@ -176,7 +184,7 @@ def preprocess_windows(windows, predict_ahead=1):
     times = torch.linspace(0, 1, inputs.shape[1])
     coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(inputs, times)
 
-    return inputs, targets, coeffs
+    return inputs, targets, coeffs, mean, std
 
 def create_data_loaders(data, targets, coeffs, train_ratio=0.8, batch_size=16):
     """
@@ -209,7 +217,7 @@ def get_data(num_samples=1):
     # Configuration
     config = {
         'ticker': 'IBM',
-        'start_date': '2013-01-01',
+        'start_date': '2003-01-01',
         'end_date': '2023-01-01',
         'window_size': 50,
         'train_ratio': 0.8,
@@ -244,14 +252,14 @@ def get_data(num_samples=1):
     windows = create_windows(prices, config['window_size'])
 
     # Preprocess windows
-    inputs, targets, coeffs = preprocess_windows(windows, predict_ahead=config['num_samples'])
+    inputs, targets, coeffs, mean, std = preprocess_windows(windows, predict_ahead=config['num_samples'])
 
     # Create DataLoaders
     train_loader, test_loader = create_data_loaders(
         inputs, targets, coeffs, config['train_ratio'], config['batch_size']
     )
 
-    return train_loader, test_loader
+    return train_loader, test_loader, mean, std
 
 
 

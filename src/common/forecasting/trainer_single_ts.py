@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon):
+def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon, mean, std):
     global all_preds, all_trues
 
     results = {
@@ -64,13 +64,20 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_preds = torch.cat(all_preds, dim=0)
             all_trues = torch.cat(all_trues, dim=0)
 
-            # plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
+            # Denormalize
+            all_preds = all_preds * std[1] + mean[1]
+            all_trues = all_trues * std[1] + mean[1]
+            all_windows = all_windows * std[1] + mean[1]
+
+            plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
 
     results["avg_L2_error"] = avg_loss
 
     return results
 
 def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
+    import numpy as np
+    import matplotlib.pyplot as plt
 
     plt.figure(figsize=(12, 6))
 
@@ -79,6 +86,12 @@ def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
         input_window = all_windows[j].numpy()  # 20-day input window
         true_value = all_trues[j].numpy()      # True 21st-day value
         pred_value = all_preds[j].numpy()      # Predicted 21st-day value
+
+        # Combine all values for the current sample to compute y-limits
+        sample_values = np.concatenate([input_window.flatten(), true_value.flatten(), pred_value.flatten()])
+        y_min, y_max = np.min(sample_values), np.max(sample_values)
+        padding = (y_max - y_min) * 0.1  # Add 10% padding
+        y_min, y_max = y_min - padding, y_max + padding
 
         time_indices = range(len(input_window))
 
@@ -122,10 +135,15 @@ def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
                     label='Predictions' if i == 0 else ""
                 )
 
-    plt.xlabel('Time')
-    plt.ylabel('Value')
-    plt.ylim(-3, 3)
-    plt.title('Model Predictions vs True Values')
-    plt.legend()
-    plt.show()
+        plt.xlabel('Time')
+        plt.ylabel('Value')
+        plt.ylim(y_min, y_max)  # Dynamically set the y-limits for the current sample
+        plt.title(f'Sample {i+1}: Model Predictions vs True Values')
+        plt.legend()
+        plt.show()  # Show the plot for the current sample
+
+    # Avoid overlapping figures
+    plt.close()
+
+
 

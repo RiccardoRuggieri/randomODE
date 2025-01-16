@@ -12,7 +12,7 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     :return:
     """
     input_dim = 3 + 1
-    forecast_horizon = 25
+    forecast_horizon = 10
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -31,17 +31,21 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
                               vector_field=sde.GeneratorFunc).to(device)
 
     # 300 epochs
-    num_epochs = 1
+    num_epochs = 300
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.MSELoss()
 
     # Here we get the data
-    train_loader, test_loader = single_ts_prediction.get_data(num_samples=forecast_horizon)
+    train_loader, test_loader, mean, std = single_ts_prediction.get_data(num_samples=forecast_horizon)
 
     # Here we train the model for forecasting
-    train(model, optimizer, num_epochs, train_loader, test_loader, device, criterion, forecast_horizon=forecast_horizon)
+    train(model, optimizer, num_epochs,
+          train_loader, test_loader,
+          device, criterion,
+          forecast_horizon=forecast_horizon,
+          mean=mean, std=std)
 
 if __name__ == '__main__':
-    main_classical_training('ode')
+    main_classical_training('ode', 64, 1)

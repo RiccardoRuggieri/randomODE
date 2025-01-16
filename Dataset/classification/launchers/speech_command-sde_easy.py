@@ -29,7 +29,7 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
 
 
     # 200 epochs
-    num_epochs = 1
+    num_epochs = 200
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)

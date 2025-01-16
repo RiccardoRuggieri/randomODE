@@ -35,7 +35,7 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
                                    final_nonlinearity=True).to(device)
 
     # num_epochs = 100
-    num_epochs = 2
+    num_epochs = 100
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
