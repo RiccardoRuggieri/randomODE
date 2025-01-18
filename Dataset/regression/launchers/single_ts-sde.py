@@ -12,7 +12,7 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     :return:
     """
     input_dim = 3 + 1
-    forecast_horizon = 10
+    forecast_horizon = 15
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
