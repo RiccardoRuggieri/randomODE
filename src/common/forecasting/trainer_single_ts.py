@@ -69,7 +69,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             all_trues = all_trues * std[1] + mean[1]
             all_windows = all_windows * std[1] + mean[1]
 
-            # plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
+            plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
 
     results["avg_L2_error"] = avg_loss
 
@@ -83,6 +83,7 @@ def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
 
     for i in range(num_samples):
         j = np.random.randint(0, len(all_trues))
+        # j = 5
         input_window = all_windows[j].numpy()  # 20-day input window
         true_value = all_trues[j].numpy()      # True 21st-day value
         pred_value = all_preds[j].numpy()      # Predicted 21st-day value

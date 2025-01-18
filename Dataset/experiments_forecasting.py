@@ -3,10 +3,10 @@ import pandas as pd
 
 # Define configurations
 configurations = {
-    "Dataset/regression/launchers/single_ts-sde_easy": "Single_TS",
+    "Dataset/regression/launchers/single_ts-sde": "Single_TS",
 }
 
-num_layers_range = range(1, 5) # 1, 2, 3, 4
+num_layers_range = range(1, 3) # 1, 2, 3, 4
 hidden_dims = [16, 32, 64, 128] # 16, 32, 64, 128
 
 # Results dictionary to store performance
@@ -17,7 +17,7 @@ for module_path, experiment_name in configurations.items():
     module_name = module_path.replace("/", ".")
     experiment_module = importlib.import_module(module_name)
 
-    for model_type in ["ode", "ode_nl", "sde"]:
+    for model_type in ["ode", "sde"]:
         for num_layers in num_layers_range:
             for hidden_dim in hidden_dims:
                 print(f"Running {experiment_name} | type={model_type}, num_layers={num_layers}, hidden_dim={hidden_dim}")
@@ -25,11 +25,6 @@ for module_path, experiment_name in configurations.items():
                 # Capture the result (assuming main_classical_training returns a structured dictionary)
                 try:
                     result = experiment_module.main_classical_training(type=model_type, hidden_dim=hidden_dim, num_layers=num_layers)
-
-                    for i in range(10):
-                        result.append(experiment_module.main_classical_training(type=model_type, hidden_dim=hidden_dim, num_layers=num_layers))
-
-                    result["avg_L2_error"] = sum([r["L2_error"] for r in result]) / len(result)
 
                     # Append additional metadata
                     result.update({
