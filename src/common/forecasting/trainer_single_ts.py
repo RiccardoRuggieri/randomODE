@@ -82,8 +82,8 @@ def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon):
     plt.figure(figsize=(12, 6))
 
     for i in range(num_samples):
-        j = np.random.randint(0, len(all_trues))
-        # j = 5
+        #j = np.random.randint(0, len(all_trues))
+        j = 5
         input_window = all_windows[j].numpy()  # 20-day input window
         true_value = all_trues[j].numpy()      # True 21st-day value
         pred_value = all_preds[j].numpy()      # Predicted 21st-day value

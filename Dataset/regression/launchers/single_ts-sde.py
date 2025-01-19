@@ -11,8 +11,8 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     Generate the OU process data and train the model for a regression task using a neural sde langevin model.
     :return:
     """
-    input_dim = 3 + 1
-    forecast_horizon = 7
+    input_dim = 6 + 1
+    forecast_horizon = 5
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -50,4 +50,4 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     return results
 
 if __name__ == '__main__':
-    main_classical_training('ode', 128, 2)
+    main_classical_training('ode', 64, 1)
