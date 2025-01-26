@@ -1,9 +1,9 @@
 import torch
 import torch.optim as optim
-from Dataset.classification.utils import MIT_BIH_easy
-import model.classification.ode_flow as ode_flow
+from Dataset.classification.utils import MIT_BIH
+import model.classification.randomODE as ode_flow
 import model.classification.sde as sde
-from common.classification.trainer_classification_easy import _train_loop
+from common.classification.trainer import _train_loop
 
 
 def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
@@ -35,14 +35,14 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
                                    final_nonlinearity=True).to(device)
 
     # num_epochs = 100
-    num_epochs = 100
+    num_epochs = 30
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
-    train_loader, test_loader, _ = MIT_BIH_easy.get_data()
+    train_loader, test_loader, _ = MIT_BIH.get_data()
 
     # Here we train the model
     results = _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion)

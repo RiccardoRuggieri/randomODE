@@ -39,13 +39,14 @@ class GeneratorFunc(torch.nn.Module):
         self.X = torchcde.CubicSpline(self.coeffs, self.times)
 
     def f(self, t, y):
-        Xt = self.X.evaluate(t)
-        Xt = self.linear_X(Xt)
+        #Xt = self.X.evaluate(t)
+        #Xt = self.linear_X(Xt)
         if t.dim() == 0:
             t = torch.full_like(y[:, 0], fill_value=t).unsqueeze(-1)
         yy = self.linear_in(torch.cat((t, y), dim=-1))
-        z = self.emb(torch.cat([yy, Xt], dim=-1))
-        z = z.relu()
+        #z = self.emb(torch.cat([yy, Xt], dim=-1))
+        #z = z.relu()
+        z = yy
         for linear in self.linears:
             z = linear(z)
             z = z.relu()

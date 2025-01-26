@@ -44,7 +44,8 @@ class GeneratorFunc(torch.nn.Module):
         if t.dim() == 0:
             t = torch.full_like(y[:, 0], fill_value=t).unsqueeze(-1)
         yy = self.linear_in(torch.cat((t, y), dim=-1))
-        z = self.emb(torch.cat([yy, Xt], dim=-1))
+        #z = self.emb(torch.cat([yy, Xt], dim=-1))
+        z = yy
         z = z.relu()
         for linear in self.linears:
             z = linear(z)
@@ -69,10 +70,10 @@ class Generator(torch.nn.Module):
         super(Generator, self).__init__()
         self.func = vector_field(input_dim, hidden_dim, hidden_dim, num_layers, activation=activation)
         self.initial = nn.Linear(input_dim, hidden_dim)
-        # self.classifier = torch.nn.Sequential(torch.nn.Linear(hidden_dim, hidden_dim),
-        #                                       torch.nn.BatchNorm1d(hidden_dim), torch.nn.ReLU(), torch.nn.Dropout(0.1),
-        #                                       torch.nn.Linear(hidden_dim, num_classes))
-        self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.classifier = torch.nn.Sequential(torch.nn.Linear(hidden_dim, hidden_dim),
+                                              torch.nn.BatchNorm1d(hidden_dim), torch.nn.ReLU(), torch.nn.Dropout(0.1),
+                                              torch.nn.Linear(hidden_dim, num_classes))
+        # self.classifier = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, coeffs, times):
         self.func.set_X(coeffs, times)

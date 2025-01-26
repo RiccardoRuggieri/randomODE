@@ -1,11 +1,10 @@
 import pathlib
 import requests
 import zipfile
-from torch.utils.data import Dataset, DataLoader
+import torchcde
+from torch.utils.data import Dataset, DataLoader, random_split
 import torch
-
 from wfdb import rdsamp, rdann
-from Dataset.classification.utils import common
 
 from sklearn.preprocessing import scale
 
@@ -45,7 +44,6 @@ def download_data():
 # 7. ! - AFW (Ventricular flutter wave)
 # 8. E - VEB (Ventricular escape beat)
 
-# Dataset class
 class MITBIHDataset(Dataset):
     def __init__(self, data_dir, segment_length=360, sampling_rate=360):
         self.data_dir = data_dir
@@ -62,7 +60,11 @@ class MITBIHDataset(Dataset):
             '!': 6,
             'E': 7,
         }
-        self.data = self._process_data()
+        self.times = torch.linspace(0, 1, segment_length)  # Uniformly spaced time values
+        if not (processed_data_loc / "processed_data.pt").exists():
+            self.data = self._process_data()
+        else:
+            self.data = torch.load(processed_data_loc / "processed_data.pt")
         if not self.data:
             raise ValueError("No data processed. Verify dataset path and processing logic.")
 
@@ -72,13 +74,10 @@ class MITBIHDataset(Dataset):
             print(f"No records found in {self.data_dir}. Check dataset path.")
             return []
 
-        # Define max count per class (20% of max_count for num classes)
         class_max_count = self.max_count // len(self.symbol_to_class)
-
-        # Dictionary to track the count for each class
         class_counts = {class_id: 0 for class_id in set(self.symbol_to_class.values())}
-
         data = []
+
         for record in records:
             record_path = str(self.data_dir / record)
             try:
@@ -88,13 +87,9 @@ class MITBIHDataset(Dataset):
                 print(f"Error reading record {record}: {e}")
                 continue
 
-            # Normalize signals
-            # signals = (signals - np.mean(signals, axis=0)) / np.std(signals, axis=0)
             signals = scale(signals).astype("float32")
 
-            # Process each annotation
             for i, annotation_sample in enumerate(annotations.sample):
-                # Determine the label for the current annotation
                 label = self.symbol_to_class.get(annotations.symbol[i], None)
                 if label is None or class_counts[label] >= class_max_count:
                     continue
@@ -102,18 +97,15 @@ class MITBIHDataset(Dataset):
                 start = annotation_sample - self.segment_length // 2
                 end = annotation_sample + self.segment_length // 2
 
-                # Ensure the segment stays within bounds
                 if start < 0 or end > len(signals):
                     continue
 
-                segment = signals[start:end]
-                data.append((torch.tensor(segment, dtype=torch.float32),
-                             torch.tensor(label, dtype=torch.long)))
+                segment = torch.tensor(signals[start:end], dtype=torch.float32)
+                coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(segment.unsqueeze(0), self.times)
+                data.append((segment, coeffs.squeeze(0), torch.tensor(label, dtype=torch.long)))
                 class_counts[label] += 1
 
-                # Stop processing if we have reached the overall max count
                 if sum(class_counts.values()) >= self.max_count:
-                    print(f"Reached max count: {self.max_count}")
                     break
             if sum(class_counts.values()) >= self.max_count:
                 break
@@ -122,144 +114,63 @@ class MITBIHDataset(Dataset):
             print(f"No valid segments found for records in {self.data_dir}.")
             return []
 
-        # Save the processed data
         save_path = processed_data_loc / "processed_data.pt"
         torch.save(data, save_path)
         print(f"Processed data saved at {save_path}")
-
         return data
 
-
     def __len__(self):
-        """
-        Returns the total number of samples in the dataset.
-        """
         return len(self.data)
 
     def __getitem__(self, idx):
-        """
-        Returns a single data sample at the given index.
-        """
-        return self.data[idx]
+        segment, coeffs, label = self.data[idx]
+        return segment, coeffs, label
 
-# DataLoader function
-def get_data_loader(batch_size=32, segment_length=360, sampling_rate=360):
+def split_data(dataset, train_ratio=0.8):
+    total_size = len(dataset)
+    train_size = int(total_size * train_ratio)
+    test_size = total_size - train_size
+
+    train_data, test_data = random_split(dataset, [train_size, test_size])
+    return train_data, test_data
+
+
+def create_dataloaders(train_data, test_data, batch_size=16):
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
+
+def get_data():
+    config = {
+        'batch_size': 32,
+        'segment_length': 180,
+        'sampling_rate': 360,
+        'train_ratio': 0.8,
+        'seed': 42,
+    }
+
+    def seed_everything(seed):
+        import random
+        import os
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.random.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = True
+
+    seed_everything(config['seed'])
+
     download_data()
+
     dataset = MITBIHDataset(data_dir=dataset_loc,
-                            segment_length=segment_length,
-                            sampling_rate=sampling_rate)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+                            segment_length=config['segment_length'],
+                            sampling_rate=config['sampling_rate'])
 
-def tensor_data(batch_size=32, segment_length=360, sampling_rate=360):
-    dataset = get_data_loader(batch_size, segment_length, sampling_rate)
-    # Extract X and y from the dataset
-    X_list = []
-    y_list = []
-    for batch in dataset:
-        X_batch, y_batch = batch
-        X_list.append(X_batch)
-        y_list.append(y_batch)
+    train_data, test_data = split_data(dataset.data, config['train_ratio'])
 
-    X = torch.cat(X_list, dim=0)
-    y = torch.cat(y_list, dim=0)
+    train_loader, test_loader = create_dataloaders(train_data, test_data, config['batch_size'])
 
-    return X, y
-
-def get_data(batch_size=32, segment_length=360, sampling_rate=360):
-    X, y = tensor_data(batch_size, segment_length, sampling_rate)
-
-    # Generate times based on sampling rate and segment length
-    time_step = 1 / sampling_rate
-    times = torch.linspace(0, (X.size(1) - 1) * time_step, X.size(1))
-    final_index = torch.tensor(X.size(1) - 1).repeat(X.size(0))
-
-    (times, train_coeffs, val_coeffs, test_coeffs, train_y, val_y, test_y, train_final_index, val_final_index,
-     test_final_index, _) = common.preprocess_data(times, X, y, final_index,
-                                                   append_times=True,
-                                                   append_intensity=False)
-
-    common.save_data(processed_data_loc,
-                     times=times,
-                     train_coeffs=train_coeffs, val_coeffs=val_coeffs, test_coeffs=test_coeffs,
-                     train_y=train_y, val_y=val_y, test_y=test_y, train_final_index=train_final_index,
-                     val_final_index=val_final_index, test_final_index=test_final_index)
-
-    tensors = common.load_data(processed_data_loc)
-    times = tensors['times']
-    train_coeffs = tensors['train_coeffs']
-    val_coeffs = tensors['val_coeffs']
-    test_coeffs = tensors['test_coeffs']
-    train_y = tensors['train_y']
-    val_y = tensors['val_y']
-    test_y = tensors['test_y']
-    train_final_index = tensors['train_final_index']
-    val_final_index = tensors['val_final_index']
-    test_final_index = tensors['test_final_index']
-
-    times, train_dataloader, val_dataloader, test_dataloader = common.wrap_data(times, train_coeffs, val_coeffs,
-                                                                                test_coeffs, train_y, val_y, test_y,
-                                                                                train_final_index, val_final_index,
-                                                                                test_final_index, 'cpu',
-                                                                                batch_size=batch_size)
-
-    return times, train_dataloader, val_dataloader, test_dataloader
-
-if __name__ == "__main__":
-    try:
-        _, train_dataloader, _, _ = get_data(batch_size=32, segment_length=360, sampling_rate=360)
-        first_batch = next(iter(train_dataloader))
-        X, y = first_batch[0][0], first_batch[1][0]
-        print(f"First feature shape: {X.shape}") # 1799 x 12
-        print(f"First label: {y}") # a scalar value
-    except ValueError as e:
-        print(f"Error: {e}")
-
-# # MIT-BIH Classification Task
-#
-# The MIT-BIH dataset consists of ECG data with various heartbeat types. This task involves classifying ECG segments into 5 different classes based on their annotations.
-#
-# ## Classes and Their Meanings
-#
-# 1. **Class 0: Normal Beats**
-#    - Includes:
-#      - `N` (Normal)
-#      - `L` (Left bundle branch block)
-#      - `R` (Right bundle branch block)
-#      - `e` (Atrial escape)
-#      - `j` (Nodal (junctional) escape)
-#
-# 2. **Class 1: Supraventricular Ectopic Beats**
-#    - Includes:
-#      - `A` (Atrial premature)
-#      - `a` (Aberrated atrial premature)
-#      - `J` (Nodal (junctional) premature)
-#
-# 3. **Class 2: Ventricular Ectopic Beats**
-#    - Includes:
-#      - `V` (Premature ventricular contraction)
-#      - `E` (Ventricular escape)
-#
-# 4. **Class 3: Fusion Beats**
-#    - Includes:
-#      - `F` (Fusion of ventricular and normal)
-#
-# 5. **Class 4: Unknown or Unclassifiable Beats**
-#    - Includes:
-#      - `/` (Paced)
-#      - `f` (Fusion of paced and normal)
-#      - `Q` (Unclassifiable)
-#
-# ## Dataset Details
-#
-# - **Input (`X`)**:
-#   - Shape: `[batch_size, 1800, 2]`
-#   - `1800`: Number of time steps in each segment (5 seconds of data at a 360 Hz sampling rate).
-#   - `2`: Number of channels (e.g., ECG leads).
-#
-# - **Target (`y`)**:
-#   - Shape: `[batch_size]`
-#   - Contains the class label for each segment.
-#
-# ## Task
-#
-# The objective is to classify each ECG segment into one of the 5 heartbeat classes based on the input data. This is a **multi-class classification task**.
+    return train_loader, test_loader, config['batch_size']

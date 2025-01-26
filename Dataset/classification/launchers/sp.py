@@ -1,15 +1,14 @@
 import torch
 import torch.optim as optim
-from Dataset.classification.utils import speech_command_easy
-import model.classification.ode_flow as ode_flow
+from Dataset.classification.utils import sp
+import model.classification.randomODE as ode_flow
 import model.classification.sde as sde
-from common.classification.trainer_classification_easy import _train_loop
-
+from common.classification.trainer import _train_loop
 
 def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
 
-    input_dim = 20
-    num_classes = 10
+    input_dim = 1
+    num_classes = 4
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -27,17 +26,15 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
                               num_layers=num_layers,
                               vector_field=sde.GeneratorFunc).to(device)
 
-
-    # 200 epochs
-    num_epochs = 200
+    # 50
+    num_epochs = 40
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Here we get the data
-    data_manager = speech_command_easy.SpeechCommandsData(train_ratio=0.8, batch_size=128, seed=42)
-    train_loader, test_loader = data_manager.get_data()
+    train_loader, test_loader, _ = sp.get_data()
 
     # Here we train the model
     results = _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device, criterion)
