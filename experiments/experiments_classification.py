@@ -1,16 +1,18 @@
 import importlib
 import pandas as pd
+from tests.test_functional import hidden_dim
 
-def main():
+
+def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
         "Dataset/classification/launchers/MIT_BIH": "MIT_BIH",
-        # "Dataset/classification/launchers/sp": "SP",
-        #"Dataset/classification/launchers/speech_command": "Speech_Command",
+        "Dataset/classification/launchers/sp": "SP",
+        "Dataset/classification/launchers/speech_command": "Speech_Command",
     }
 
-    num_layers_range = range(1, 2) # 1, 2, 3
-    hidden_dims = [64] # 16, 32, 64
+    num_layers_range = range(1, num_layers) # 1, 2, 3
+    hidden_dims = hidden_dims # 16, 32, 64
 
     # Results dictionary to store performance
     results = []
@@ -20,7 +22,7 @@ def main():
         module_name = module_path.replace("/", ".")
         experiment_module = importlib.import_module(module_name)
 
-        for model_type in ["sde"]:
+        for model_type in models:
             for num_layers in num_layers_range:
                 for hidden_dim in hidden_dims:
                     print(f"Running {experiment_name} | type={model_type}, num_layers={num_layers}, hidden_dim={hidden_dim}")
@@ -54,4 +56,7 @@ def main():
         print(f"Results saved to {results_path}")
 
 if __name__ == "__main__":
-    main()
+    hidden_dims = [16, 32, 64, 128]
+    num_layers = 3
+    models = ["ode", "sde"]
+    main(hidden_dims=hidden_dims, num_layers=num_layers, models=models)

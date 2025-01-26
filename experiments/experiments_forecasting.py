@@ -2,14 +2,14 @@ import importlib
 import pandas as pd
 from common.forecasting.trainer import plot
 
-def main():
+def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
         "Dataset/forecasting/launchers/stocks": "Stocks",
     }
 
-    num_layers_range = range(1, 2) # 1, 2, 3, 4
-    hidden_dims = [128] # 16, 32, 64, 128
+    num_layers_range = range(1, num_layers) # 1, 2, 3, 4
+    hidden_dims = hidden_dims # 16, 32, 64, 128
 
     # Results dictionary to store performance
     results = []
@@ -19,7 +19,7 @@ def main():
         module_name = module_path.replace("/", ".")
         experiment_module = importlib.import_module(module_name)
 
-        for model_type in ["ode"]:
+        for model_type in models:
             for num_layers in num_layers_range:
                 for hidden_dim in hidden_dims:
                     print(f"Running {experiment_name} | type={model_type}, num_layers={num_layers}, hidden_dim={hidden_dim}")
@@ -86,4 +86,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    hidden_dims = [64]
+    num_layers = 2
+    models = ["ode"]
+    main(hidden_dims=hidden_dims, num_layers=num_layers, models=models)
