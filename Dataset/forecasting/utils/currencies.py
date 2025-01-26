@@ -7,26 +7,35 @@ import os
 import random
 import pandas as pd
 
-def fetch(tickers, start_date, end_date, sp500_ticker="^SPX"):
+def fetch(tickers, start_date, end_date, base_ticker="USD"):
     """
-    Fetches data for given tickers and computes selected features, including SP500 correlation and interest rates.
-    The output retains 'Close' as the second column and includes relevant predictors.
+    Fetches data for given tickers and computes log returns for a simplified forecasting task.
+    The output retains relevant predictors.
+
+    Parameters:
+    tickers (list): List of tickers to fetch.
+    start_date (str): Start date for data fetching.
+    end_date (str): End date for data fetching.
+    base_ticker (str): Base ticker for normalization.
+
+    Returns:
+    np.ndarray: Log returns of selected tickers.
     """
+    # Initialize the dataset
+    data = pd.DataFrame()
 
-    # Fetch S&P 500 data
-    print(f"Fetching data for {sp500_ticker}...")
-    sp500_data = yf.download(sp500_ticker, start=start_date, end=end_date)
-    sp500_data['Daily_Return'] = sp500_data['Close'].pct_change()
-    # Calculate 30-day returns (target output)
-    sp500_data['30d_Returns'] = np.log(sp500_data['Close']) - np.log(sp500_data['Close'].shift(30))
-
-    # Calculate realized volatility (RVOL): 30-day rolling standard deviation of daily returns
-    sp500_data['RVOL'] = sp500_data['Daily_Return'].rolling(window=30).std()
-
+    # Fetch data for each ticker
     for ticker in tickers:
-        sp500_data[ticker] = yf.download(ticker, start=start_date, end=end_date)['Close'].dropna()
+        ticker_data = yf.download(ticker, start=start_date, end=end_date)['Close'].dropna()
+        data[ticker] = ticker_data
 
-    return sp500_data[['RVOL', '30d_Returns', '^VIX', '^VVIX', '^VXN', '^GVZ', '^OVX']].dropna().values
+    # Compute log returns: log(current_price / previous_price)
+    log_returns = np.log(data / data.shift(10)).dropna()
+
+    # Select the tickers of interest
+    selected_data = log_returns[['^OVX', 'EURUSD=X', '^VXN', '^VIX']].dropna()
+
+    return selected_data.values
 
 
 def create_windows(prices, window_size=21, num_samples=1):
@@ -34,17 +43,16 @@ def create_windows(prices, window_size=21, num_samples=1):
     Split prices into non-overlapping windows.
 
     Parameters:
-    prices (np.ndarray): Stock prices.
+    prices (np.ndarray): Exchange rate data.
     window_size (int): Size of each window.
 
     Returns:
-    np.ndarray: Non-overlapping windows of stock prices.
+    np.ndarray: Non-overlapping windows of exchange rate data.
     """
     windows = []
     for i in range(0, len(prices) - window_size + 1, num_samples):
         windows.append(prices[i:i + window_size])
     return np.array(windows)
-
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, data, targets, coeffs):
@@ -58,14 +66,13 @@ class TimeSeriesDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx, ...], self.targets[idx, ...], self.coeffs[idx, ...]
 
-
 def preprocess_windows(windows, predict_ahead=1):
     """
     Preprocess overlapping windows by separating input (20 days) and target (21st day),
     normalizing, and interpolating data with cubic splines.
 
     Parameters:
-    windows (np.ndarray): Overlapping windows of prices.
+    windows (np.ndarray): Overlapping windows of exchange rate data.
 
     Returns:
     torch.Tensor: Inputs for training (cubic spline interpolated).
@@ -78,7 +85,7 @@ def preprocess_windows(windows, predict_ahead=1):
 
     print(inputs.shape)
 
-    # Normalize each feature in inputs and targets independently
+    # Normalize inputs and targets independently
     input_mean = inputs.mean(axis=(0, 1), keepdims=True)
     input_std = inputs.std(axis=(0, 1), keepdims=True)
     inputs = (inputs - input_mean) / input_std
@@ -100,11 +107,9 @@ def preprocess_windows(windows, predict_ahead=1):
 
     return inputs, targets, coeffs, target_mean, target_std
 
-
 def create_data_loaders(data, targets, coeffs, train_ratio=0.8, batch_size=16):
     """
-    Split data into train and test sets based on a temporal split,
-    ensuring no overlap in forecasting horizons, then create DataLoaders.
+    Split data into train and test sets and create DataLoaders.
 
     Parameters:
     data (torch.Tensor): Input data.
@@ -133,23 +138,23 @@ def create_data_loaders(data, targets, coeffs, train_ratio=0.8, batch_size=16):
 
     return train_loader, test_loader
 
-
 def get_data(num_samples=1):
     """
-    Main function to fetch data, create windows, preprocess, and generate DataLoaders.
+    Fetch data, create windows, preprocess, and generate DataLoaders.
 
     Returns:
     DataLoader, DataLoader: Train and test DataLoaders.
     tuple: Mean and standard deviation of targets (for denormalization).
     """
     config = {
-        'ticker': ['^VIX', '^VVIX', '^VXN', '^GVZ', '^OVX'],
-        'start_date': '2008-01-01',
+        'tickers': ['EURUSD=X', 'GBPUSD=X', 'JPYUSD=X', 'EURCHF=X', 'EURGBP=X', 'EURJPY=X', 'JPY=X',
+                    '^VIX', '^VVIX', '^VXN', '^GVZ', '^OVX', 'GC=F'],
+        'start_date': '2005-01-01',
         'end_date': '2025-01-01',
-        'window_size': 60,
+        'window_size': 40,
         'train_ratio': 0.8,
-        'batch_size': 32,
-        'seed': 36,
+        'batch_size': 16,
+        'seed': 42,
         'num_samples': num_samples,
     }
 
@@ -166,19 +171,9 @@ def get_data(num_samples=1):
 
     # seed_everything(config['seed'])
 
-    prices = fetch(config['ticker'], config['start_date'], config['end_date'])
-    windows = create_windows(prices, config['window_size'], num_samples)
+    prices = fetch(config['tickers'], config['start_date'], config['end_date'])
+    windows = create_windows(prices, config['window_size'], config['num_samples'])
     inputs, targets, coeffs, mean, std = preprocess_windows(windows, predict_ahead=config['num_samples'])
     train_loader, test_loader = create_data_loaders(inputs, targets, coeffs, config['train_ratio'], config['batch_size'])
 
     return train_loader, test_loader, mean, std
-
-
-
-
-
-
-
-
-
-

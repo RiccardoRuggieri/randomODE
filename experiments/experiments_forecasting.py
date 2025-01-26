@@ -6,6 +6,7 @@ def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
         "Dataset/forecasting/launchers/stocks": "Stocks",
+        "Dataset/forecasting/launchers/currencies": "Currencies",
     }
 
     num_layers_range = range(1, num_layers) # 1, 2, 3, 4
