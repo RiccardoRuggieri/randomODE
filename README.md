@@ -2,6 +2,9 @@
 
 This repository contains the implementation of **Random Neural ODEs (rNODE)**, a subclass of neural ordinary differential equations (NODEs) designed to incorporate stochasticity directly into the vector fields while remaining compatible with classical ODE solvers.
 
+![Alt text](src/experiments/logo.png)
+
+
 ## Repository Structure
 
 - **`src/`**: Core implementation of rNODEs, including vector field definitions and solvers.
