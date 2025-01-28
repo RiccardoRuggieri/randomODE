@@ -1,14 +1,13 @@
 import importlib
 import pandas as pd
-from tests.test_functional import hidden_dim
 
 
 def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
-        "Dataset/classification/launchers/MIT_BIH": "MIT_BIH",
-        "Dataset/classification/launchers/sp": "SP",
-        "Dataset/classification/launchers/speech_command": "Speech_Command",
+        #"Dataset/classification/launchers/MIT_BIH": "MIT_BIH",
+        #"Dataset/classification/launchers/sp": "SP",
+        "Dataset/classification/launchers/speech_commands": "Speech_Command",
     }
 
     num_layers_range = range(1, num_layers) # 1, 2, 3
@@ -56,7 +55,7 @@ def main(hidden_dims, num_layers, models):
         print(f"Results saved to {results_path}")
 
 if __name__ == "__main__":
-    hidden_dims = [16, 32, 64, 128]
-    num_layers = 3
-    models = ["ode", "sde"]
+    hidden_dims = [32]
+    num_layers = 2
+    models = ["sde", "ode"]
     main(hidden_dims=hidden_dims, num_layers=num_layers, models=models)

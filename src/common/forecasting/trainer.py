@@ -164,7 +164,7 @@ def plot(all_windows, all_preds, all_trues, num_samples, forecast_horizon, resul
         # Save the plot to the output directory
         # plt.show()
         file_path = os.path.join(output_dir, f"sample_{i+1}.png")
-        plt.savefig(file_path)
+        #plt.savefig(file_path)
         plt.close()  # Close the plot to free up memory
 
     return results

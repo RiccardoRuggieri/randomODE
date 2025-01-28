@@ -7,7 +7,7 @@ import os
 import random
 import pandas as pd
 
-def fetch(tickers, start_date, end_date, base_ticker="USD"):
+def fetch(tickers, start_date, end_date):
     """
     Fetches data for given tickers and computes log returns for a simplified forecasting task.
     The output retains relevant predictors.
@@ -147,8 +147,7 @@ def get_data(num_samples=1):
     tuple: Mean and standard deviation of targets (for denormalization).
     """
     config = {
-        'tickers': ['EURUSD=X', 'GBPUSD=X', 'JPYUSD=X', 'EURCHF=X', 'EURGBP=X', 'EURJPY=X', 'JPY=X',
-                    '^VIX', '^VVIX', '^VXN', '^GVZ', '^OVX', 'GC=F'],
+        'tickers': ['EURUSD=X', '^VIX', '^VXN', '^OVX'],
         'start_date': '2005-01-01',
         'end_date': '2025-01-01',
         'window_size': 40,

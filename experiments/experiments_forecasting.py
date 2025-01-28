@@ -5,7 +5,7 @@ from common.forecasting.trainer import plot
 def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
-        "Dataset/forecasting/launchers/stocks": "Stocks",
+        #"Dataset/forecasting/launchers/stocks": "Stocks",
         "Dataset/forecasting/launchers/currencies": "Currencies",
     }
 
@@ -31,7 +31,7 @@ def main(hidden_dims, num_layers, models):
                         avg_error = 0
                         pred = None
                         predictions = []
-                        for i in range(10):
+                        for i in range(3):
                             result = experiment_module.main_classical_training(type=model_type, hidden_dim=hidden_dim, num_layers=num_layers)
                             if avg_error == 0:
                                 avg_error = result["avg_error"]
@@ -44,8 +44,8 @@ def main(hidden_dims, num_layers, models):
                                 pred += result["chosen_pred"]
                                 predictions.append(result["chosen_pred"])
 
-                        pred /= 10
-                        avg_error /= 10
+                        pred /= 3
+                        avg_error /= 3
 
                         # plot the results of the last run shifted with stdev
                         plot(result["chosen_window"],
@@ -87,7 +87,7 @@ def main(hidden_dims, num_layers, models):
 
 
 if __name__ == "__main__":
-    hidden_dims = [64]
+    hidden_dims = [32, 64, 128, 256]
     num_layers = 2
     models = ["ode"]
     main(hidden_dims=hidden_dims, num_layers=num_layers, models=models)

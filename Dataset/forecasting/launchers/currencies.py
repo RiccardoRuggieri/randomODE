@@ -3,13 +3,13 @@ import model.forecasting.sde as sde
 import torch
 import torch.optim as optim
 from common.forecasting.trainer import _train_loop as train
-import Dataset.forecasting.utils.stocks as stocks
+import Dataset.forecasting.utils.currencies as currencies
 
 
 def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
 
-    input_dim = 7 + 1
-    forecast_horizon = 20
+    input_dim = 4 + 1
+    forecast_horizon = 10
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -35,7 +35,7 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     criterion = torch.nn.L1Loss()
 
     # Here we get the data
-    train_loader, test_loader, mean, std = stocks.get_data(num_samples=forecast_horizon)
+    train_loader, test_loader, mean, std = currencies.get_data(num_samples=forecast_horizon)
 
     # Here we train the model for forecasting
     results = train(model, optimizer, num_epochs,
