@@ -5,8 +5,16 @@ import torch.optim as optim
 from common.forecasting.trainer import _train_loop as train
 import Dataset.forecasting.utils.stocks as stocks
 
+class MAPELoss(torch.nn.Module):
+    def __init__(self, epsilon=1e-8):
+        super(MAPELoss, self).__init__()
+        self.epsilon = epsilon  # Avoid division by zero
 
-def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
+    def forward(self, y_pred, y_true):
+        return torch.mean(torch.abs((y_true - y_pred) / (y_true + self.epsilon)))
+
+
+def main_classical_training(type='ode', hidden_dim=16, num_layers=1, criterion='L1', with_stdev=False):
 
     input_dim = 7 + 1
     forecast_horizon = 20
@@ -32,7 +40,12 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
     lr = 1e-3
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = torch.nn.L1Loss()
+    if criterion == 'L1':
+        criterion = torch.nn.L1Loss()
+    elif criterion == 'MSE':
+        criterion = torch.nn.MSELoss()
+    elif criterion == 'MAPE':
+        criterion = MAPELoss()
 
     # Here we get the data
     train_loader, test_loader, mean, std = stocks.get_data(num_samples=forecast_horizon)
@@ -42,9 +55,12 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1):
                     train_loader, test_loader,
                     device, criterion,
                     forecast_horizon=forecast_horizon,
-                    mean=mean, std=std)
+                    mean=mean, std=std,
+                    with_stdev=with_stdev)
 
     return results
 
 if __name__ == '__main__':
-    main_classical_training('ode', 128, 2)
+    # available criterion: 'L1', 'MSE', 'MAPE'
+    # available type: 'ode', 'sde'
+    main_classical_training('ode', 64, 1, 'L1')

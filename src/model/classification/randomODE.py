@@ -12,7 +12,7 @@ class MLP(nn.Module):
             model.append(nn.Linear(hidden_dim, hidden_dim))
             model.append(activation_fn)
         model.append(nn.Linear(hidden_dim, out_size))
-        # model.append(activation_fn)
+        # model.append(torch.nn.Tanh())
         self._model = nn.Sequential(*model)
 
     def forward(self, x):

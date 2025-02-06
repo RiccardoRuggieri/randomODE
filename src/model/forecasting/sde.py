@@ -46,7 +46,7 @@ class GeneratorFunc(torch.nn.Module):
         yy = self.linear_in(torch.cat((t, y), dim=-1))
         z = self.emb(torch.cat([yy, Xt], dim=-1))
         z = z.relu()
-        z = yy
+        # z = yy
         for linear in self.linears:
             z = linear(z)
             z = z.relu()

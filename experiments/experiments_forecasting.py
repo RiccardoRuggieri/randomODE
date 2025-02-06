@@ -5,8 +5,7 @@ from common.forecasting.trainer import plot
 def main(hidden_dims, num_layers, models):
     # Define configurations
     configurations = {
-        #"Dataset/forecasting/launchers/stocks": "Stocks",
-        "Dataset/forecasting/launchers/currencies": "Currencies",
+        "Dataset/forecasting/launchers/stocks": "Stocks",
     }
 
     num_layers_range = range(1, num_layers) # 1, 2, 3, 4
@@ -31,8 +30,8 @@ def main(hidden_dims, num_layers, models):
                         avg_error = 0
                         pred = None
                         predictions = []
-                        for i in range(3):
-                            result = experiment_module.main_classical_training(type=model_type, hidden_dim=hidden_dim, num_layers=num_layers)
+                        for i in range(5):
+                            result = experiment_module.main_classical_training(type=model_type, hidden_dim=hidden_dim, num_layers=num_layers, with_stdev=True)
                             if avg_error == 0:
                                 avg_error = result["avg_error"]
                             else:
@@ -44,17 +43,18 @@ def main(hidden_dims, num_layers, models):
                                 pred += result["chosen_pred"]
                                 predictions.append(result["chosen_pred"])
 
-                        pred /= 3
-                        avg_error /= 3
+                        pred /= 5
+                        avg_error /= 5
 
                         # plot the results of the last run shifted with stdev
                         plot(result["chosen_window"],
                              pred,
                              result["chosen_true"],
-                             8,
+                             5,
                              result["forecast_horizon"],
                              results=result,
-                             predictions=predictions)
+                             predictions=predictions,
+                             model_type=f'{model_type}_{num_layers}_{hidden_dim}')
 
                         result["chosen_pred"] = None
                         result["chosen_true"] = None
@@ -87,7 +87,7 @@ def main(hidden_dims, num_layers, models):
 
 
 if __name__ == "__main__":
-    hidden_dims = [32, 64, 128, 256]
+    hidden_dims = [16, 32, 64, 128]
     num_layers = 2
-    models = ["ode"]
+    models = ["ode", "sde"]
     main(hidden_dims=hidden_dims, num_layers=num_layers, models=models)
