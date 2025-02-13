@@ -27,7 +27,7 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
 
             total_loss += loss.item()
 
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
             avg_loss = total_loss / len(train_loader)
             print(f'Epoch {epoch}')
             print(f'Train Loss: {avg_loss}')
@@ -71,14 +71,14 @@ def _train_loop(model, optimizer, num_epochs, train_loader, test_loader, device,
             # all_preds = all_preds * std[1] + mean[1]
             # all_trues = all_trues * std[1] + mean[1]
             # all_windows = all_windows * std[1] + mean[1]
-
-            # plot(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
+            if epoch % 10 == 0:
+                plot_withoutStdev(all_windows, all_preds, all_trues, num_samples=1, forecast_horizon=forecast_horizon)
 
     if with_stdev:
         results = plot(all_windows, all_preds, all_trues, num_samples=10, forecast_horizon=forecast_horizon, results=results)
         results["avg_error"] = avg_loss
     else:
-        results = plot_withoutStdev(all_windows, all_preds, all_trues, num_samples=10, forecast_horizon=forecast_horizon)
+        results = plot_withoutStdev(all_windows, all_preds, all_trues, num_samples=5, forecast_horizon=forecast_horizon)
 
     return results
 

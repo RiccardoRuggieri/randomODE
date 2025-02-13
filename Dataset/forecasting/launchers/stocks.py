@@ -63,4 +63,4 @@ def main_classical_training(type='ode', hidden_dim=16, num_layers=1, criterion='
 if __name__ == '__main__':
     # available criterion: 'L1', 'MSE', 'MAPE'
     # available type: 'ode', 'sde'
-    main_classical_training('ode', 64, 1, 'L1')
+    main_classical_training(type='ode', hidden_dim=64, num_layers=1, criterion='L1')
